@@ -1,0 +1,6 @@
+{
+  "summary": "Rencana implementasi diperbarui dengan spesifikasi detail: KPI Dashboard (Omset, Laba Kotor, Laba Bersih, Transaksi, Hutang Pelanggan, Stok Menipis, Stok BBM), 3 blok daftar dashboard dengan 'Lihat Selengkapnya', Filter Tanggal Transaksi fleksibel (default hari ini), Master Data & Transaksi cerdas (PPOB Range dengan auto-mapping biaya admin, PPOB Lainnya seperti pulsa/FF, Master Barang lengkap stok & stok minimum), modul BBM, Rental PS, Hutang Pelanggan, dan sinkronisasi Google Sheets.",
+  "updatedAt": "2026-10-13T07:59:12.599304986Z",
+  "requestFeedback": true,
+  "userFacing": true
+}
