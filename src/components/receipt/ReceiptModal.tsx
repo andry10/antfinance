@@ -33,15 +33,15 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, onClose
         <div className="p-5 overflow-y-auto space-y-3 font-mono text-xs text-slate-800 dark:text-slate-200 print-area">
           {/* Store Brand */}
           <div className="text-center space-y-1 pb-3 border-b border-dashed border-slate-300 dark:border-slate-700">
-            <h2 className="font-bold text-base uppercase text-slate-900 dark:text-white">
+            <h2 className="font-bold text-base md:text-lg uppercase text-slate-900 dark:text-white">
               {settings.namaToko || 'POS Usaha Terpadu'}
             </h2>
-            <p className="text-[10px] text-slate-500">{settings.alamat}</p>
-            <p className="text-[10px] text-slate-500">Telp: {settings.noTelepon}</p>
+            <p className="text-xs text-slate-500">{settings.alamat}</p>
+            <p className="text-xs text-slate-500">Telp: {settings.noTelepon}</p>
           </div>
 
           {/* Meta Info */}
-          <div className="text-[11px] space-y-0.5 pb-2 border-b border-dashed border-slate-300 dark:border-slate-700">
+          <div className="text-xs space-y-1 pb-2 border-b border-dashed border-slate-300 dark:border-slate-700">
             <div className="flex justify-between">
               <span>No. Struk:</span>
               <span className="font-bold">{transaction.nomorStruk}</span>
@@ -67,11 +67,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, onClose
           </div>
 
           {/* Items */}
-          <div className="space-y-1.5 py-1 border-b border-dashed border-slate-300 dark:border-slate-700">
+          <div className="space-y-2 py-1.5 border-b border-dashed border-slate-300 dark:border-slate-700">
             {transaction.items.map((it, idx) => (
               <div key={idx} className="space-y-0.5">
                 <div className="font-semibold text-slate-900 dark:text-white">{it.nama}</div>
-                <div className="flex justify-between text-[11px] text-slate-600 dark:text-slate-400">
+                <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400">
                   <span>{it.qty} {it.satuan || 'x'} @ {formatRupiah(it.hargaJual)}</span>
                   <span className="font-bold text-slate-900 dark:text-white">{formatRupiah(it.subtotal)}</span>
                 </div>
@@ -80,23 +80,47 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ transaction, onClose
           </div>
 
           {/* Summary */}
-          <div className="space-y-1 pt-1 text-xs">
-            <div className="flex justify-between text-sm font-bold text-slate-900 dark:text-white">
-              <span>TOTAL:</span>
-              <span>{formatRupiah(transaction.totalJual)}</span>
+          <div className="space-y-1.5 pt-1 text-xs">
+            <div className="flex justify-between text-sm md:text-base font-bold text-slate-900 dark:text-white">
+              <span>TOTAL BELANJA:</span>
+              <span className="font-black">{formatRupiah(transaction.totalJual)}</span>
             </div>
-            <div className="flex justify-between text-[11px] text-slate-500">
+            {transaction.statusPembayaran === 'sebagian' && (
+              <>
+                <div className="flex justify-between text-xs text-slate-700 dark:text-slate-300">
+                  <span>Dibayar ({transaction.metodePembayaran.toUpperCase()}):</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    {formatRupiah(transaction.jumlahBayar || 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs text-rose-600 dark:text-rose-400 font-bold">
+                  <span>Sisa Hutang / Kasbon:</span>
+                  <span>{formatRupiah(transaction.sisaHutang || 0)}</span>
+                </div>
+              </>
+            )}
+            <div className="flex justify-between text-xs text-slate-500">
               <span>Status Bayar:</span>
-              <span className="font-bold uppercase text-emerald-600 dark:text-emerald-400">
-                {transaction.statusPembayaran === 'lunas' ? 'LUNAS' : 'HUTANG / KASBON'}
+              <span className={`font-bold uppercase ${
+                transaction.statusPembayaran === 'lunas'
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : transaction.statusPembayaran === 'sebagian'
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-rose-600 dark:text-rose-400'
+              }`}>
+                {transaction.statusPembayaran === 'lunas'
+                  ? 'LUNAS'
+                  : transaction.statusPembayaran === 'sebagian'
+                  ? 'BAYAR SEBAGIAN'
+                  : 'HUTANG / KASBON'}
               </span>
             </div>
           </div>
 
           {/* Footer note */}
-          <div className="pt-4 text-center text-[10px] text-slate-400 space-y-1">
+          <div className="pt-4 text-center text-xs text-slate-400 space-y-1">
             <p>{settings.catatanStruk || 'Terima kasih atas kunjungan Anda!'}</p>
-            <p className="font-sans text-[9px] text-slate-300">Simpan struk ini sebagai bukti pembayaran sah.</p>
+            <p className="font-sans text-xs text-slate-400/80">Simpan struk ini sebagai bukti pembayaran sah.</p>
           </div>
         </div>
 

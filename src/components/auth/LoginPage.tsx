@@ -27,7 +27,7 @@ export const LoginPage: React.FC = () => {
     setErrorMsg('');
     const success = loginManual(username.trim(), password.trim());
     if (!success) {
-      setErrorMsg('Username atau password salah. Silakan coba lagi atau gunakan tombol demo di bawah.');
+      setErrorMsg('Username atau password salah. Silakan coba lagi.');
     }
   };
 
@@ -143,7 +143,7 @@ export const LoginPage: React.FC = () => {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="owner / kasir"
+                  placeholder="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
@@ -160,7 +160,7 @@ export const LoginPage: React.FC = () => {
               <div className="relative">
                 <input
                   type="password"
-                  placeholder="123"
+                  placeholder="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
@@ -177,42 +177,6 @@ export const LoginPage: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* 3. Demo Quick Login Buttons */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
-            <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Akses Cepat (Satu Klik):
-            </span>
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('owner', '123')}
-                className="p-3 rounded-2xl border border-amber-200/80 dark:border-amber-900/60 bg-amber-50/50 dark:bg-slate-800 hover:bg-amber-100/50 text-left transition-all"
-              >
-                <div className="font-bold text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
-                  <Shield className="w-4 h-4" />
-                  <span>Owner (Penuh)</span>
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-mono">
-                  user: owner / 123
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('kasir', '123')}
-                className="p-3 rounded-2xl border border-blue-200/80 dark:border-blue-900/60 bg-blue-50/50 dark:bg-slate-800 hover:bg-blue-100/50 text-left transition-all"
-              >
-                <div className="font-bold text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
-                  <UserCheck className="w-4 h-4" />
-                  <span>Kasir Toko</span>
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 font-mono">
-                  user: kasir / 123
-                </div>
-              </button>
-            </div>
-          </div>
         </div>
       </main>
 

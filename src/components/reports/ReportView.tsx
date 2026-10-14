@@ -1,6 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatRupiah, formatNumber, formatDate, formatDateTime } from '../../utils/format';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import {
   FileText,
   Calendar,
@@ -27,6 +29,58 @@ export const ReportView: React.FC = () => {
   const { transactions, expenses, debts, bbmList, settings, triggerGoogleSheetSync, isSyncing } = useApp();
 
   const getTodayStr = () => new Date().toISOString().split('T')[0];
+
+  // Print Preview Modal State
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const pdfRef = useRef<HTMLDivElement>(null);
+
+  const handleDownloadPdf = async () => {
+    if (!pdfRef.current) return;
+    setIsExportingPdf(true);
+    try {
+      const canvas = await html2canvas(pdfRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDoc) => {
+          // Replace oklch color function in style tags to avoid html2canvas error while preserving all Tailwind CSS styles
+          clonedDoc.querySelectorAll('style').forEach(style => {
+            if (style.textContent && style.textContent.includes('oklch')) {
+              style.textContent = style.textContent.replace(/oklch\([^)]+\)/g, '#334155');
+            }
+          });
+        }
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      let heightLeft = pdfHeight;
+      let position = 0;
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`laporan-rekap-${startDate || 'semua'}-${endDate || 'semua'}.pdf`);
+      setShowPdfPreview(false);
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+      alert('Gagal menghasilkan PDF. Silakan coba lagi.');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   // Active Report Tab: 'ringkasan' | 'transaksi' | 'pengeluaran' | 'hutang'
   const [reportSubTab, setReportSubTab] = useState<'ringkasan' | 'transaksi' | 'pengeluaran' | 'hutang'>('ringkasan');
@@ -230,11 +284,19 @@ export const ReportView: React.FC = () => {
           </button>
 
           <button
-            onClick={() => window.print()}
+            onClick={() => setShowPrintPreview(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-800 text-white hover:bg-slate-900 shadow-xs transition-colors"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Cetak Rekap</span>
+          </button>
+
+          <button
+            onClick={() => setShowPdfPreview(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-rose-600 text-white hover:bg-rose-700 shadow-xs transition-colors"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Ekspor PDF</span>
           </button>
         </div>
       </div>
@@ -339,7 +401,7 @@ export const ReportView: React.FC = () => {
           {/* 1. Omset Penjualan (Soft Mint Pastel) */}
           <div className="bg-emerald-50/90 border border-emerald-200/90 p-4 rounded-2xl shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-emerald-900">1. Total Omset (Bruto)</span>
+              <span className="text-xs font-bold text-emerald-900">1. Total Omset (Bruto)</span>
               <div className="w-7 h-7 rounded-lg bg-emerald-200/60 text-emerald-800 flex items-center justify-center">
                 <TrendingUp className="w-3.5 h-3.5" />
               </div>
@@ -348,14 +410,14 @@ export const ReportView: React.FC = () => {
               <div className="text-base sm:text-xl font-extrabold font-mono text-emerald-950 tabular-nums">
                 {formatRupiah(totalOmset)}
               </div>
-              <div className="text-[10px] text-emerald-800 font-medium mt-0.5">Penerimaan kas bruto</div>
+              <div className="text-xs text-emerald-800 font-medium mt-1">Penerimaan kas bruto</div>
             </div>
           </div>
 
           {/* 2. Modal HPP (Soft Amber Pastel) */}
           <div className="bg-amber-50/90 border border-amber-200/90 p-4 rounded-2xl shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-amber-900">2. Modal Pokok (HPP)</span>
+              <span className="text-xs font-bold text-amber-900">2. Modal Pokok (HPP)</span>
               <div className="w-7 h-7 rounded-lg bg-amber-200/60 text-amber-800 flex items-center justify-center">
                 <DollarSign className="w-3.5 h-3.5" />
               </div>
@@ -364,14 +426,14 @@ export const ReportView: React.FC = () => {
               <div className="text-base sm:text-xl font-extrabold font-mono text-amber-950 tabular-nums">
                 {formatRupiah(totalModal)}
               </div>
-              <div className="text-[10px] text-amber-800 font-medium mt-0.5">Harga pokok barang & bbm</div>
+              <div className="text-xs text-amber-800 font-medium mt-1">Harga pokok barang & bbm</div>
             </div>
           </div>
 
           {/* 3. Laba Kotor (Soft Sky Pastel) */}
           <div className="bg-sky-50/90 border border-sky-200/90 p-4 rounded-2xl shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-sky-900">3. Laba Kotor Usaha</span>
+              <span className="text-xs font-bold text-sky-900">3. Laba Kotor Usaha</span>
               <div className="w-7 h-7 rounded-lg bg-sky-200/60 text-sky-800 flex items-center justify-center">
                 <Sparkles className="w-3.5 h-3.5" />
               </div>
@@ -380,14 +442,14 @@ export const ReportView: React.FC = () => {
               <div className="text-base sm:text-xl font-extrabold font-mono text-sky-950 tabular-nums">
                 {formatRupiah(labaKotor)}
               </div>
-              <div className="text-[10px] text-sky-800 font-medium mt-0.5">Omset - Modal HPP</div>
+              <div className="text-xs text-sky-800 font-medium mt-1">Omset - Modal HPP</div>
             </div>
           </div>
 
           {/* 4. Pengeluaran Beban (Soft Rose Pastel) */}
           <div className="bg-rose-50/90 border border-rose-200/90 p-4 rounded-2xl shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-rose-900">4. Beban Operasional</span>
+              <span className="text-xs font-bold text-rose-900">4. Beban Operasional</span>
               <div className="w-7 h-7 rounded-lg bg-rose-200/60 text-rose-800 flex items-center justify-center">
                 <ArrowDownCircle className="w-3.5 h-3.5" />
               </div>
@@ -396,14 +458,14 @@ export const ReportView: React.FC = () => {
               <div className="text-base sm:text-xl font-extrabold font-mono text-rose-950 tabular-nums">
                 {formatRupiah(totalPengeluaran)}
               </div>
-              <div className="text-[10px] text-rose-800 font-medium mt-0.5">{filteredExpenses.length} catatan pengeluaran</div>
+              <div className="text-xs text-rose-800 font-medium mt-1">{filteredExpenses.length} catatan pengeluaran</div>
             </div>
           </div>
 
           {/* 5. Laba Bersih Akhir (Soft Teal Pastel) */}
           <div className="col-span-2 lg:col-span-1 bg-teal-50/90 border border-teal-200/90 p-4 rounded-2xl shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-teal-900">5. Laba Bersih Akhir</span>
+              <span className="text-xs font-bold text-teal-900">5. Laba Bersih Akhir</span>
               <div className="w-7 h-7 rounded-lg bg-teal-200/60 text-teal-800 flex items-center justify-center">
                 <CheckCircle2 className="w-3.5 h-3.5" />
               </div>
@@ -412,7 +474,7 @@ export const ReportView: React.FC = () => {
               <div className="text-lg sm:text-2xl font-black font-mono text-teal-950 tabular-nums">
                 {formatRupiah(labaBersih)}
               </div>
-              <div className="text-[10px] text-teal-800 font-bold mt-0.5">
+              <div className="text-xs text-teal-800 font-bold mt-1">
                 Net Profit Margin: {netMargin}%
               </div>
             </div>
@@ -492,12 +554,12 @@ export const ReportView: React.FC = () => {
                   </div>
                   <div>
                     <div className="font-bold text-orange-950">Penjualan BBM / Pertamini</div>
-                    <div className="text-[11px] text-orange-800">{catBBM.length} transaksi · {bbmLiter.toFixed(1)} Liter terjual</div>
+                    <div className="text-xs text-orange-800">{catBBM.length} transaksi · {bbmLiter.toFixed(1)} Liter terjual</div>
                   </div>
                 </div>
                 <div className="text-right font-mono">
                   <div className="font-bold text-orange-950 text-sm">{formatRupiah(bbmOmset)}</div>
-                  <div className="text-[11px] text-emerald-700 font-bold">Laba: +{formatRupiah(bbmLaba)}</div>
+                  <div className="text-xs text-emerald-700 font-bold">Laba: +{formatRupiah(bbmLaba)}</div>
                 </div>
               </div>
 
@@ -509,12 +571,12 @@ export const ReportView: React.FC = () => {
                   </div>
                   <div>
                     <div className="font-bold text-purple-950">Rental PlayStation</div>
-                    <div className="text-[11px] text-purple-800">{catPS.length} sesi rental selesai</div>
+                    <div className="text-xs text-purple-800">{catPS.length} sesi rental selesai</div>
                   </div>
                 </div>
                 <div className="text-right font-mono">
                   <div className="font-bold text-purple-950 text-sm">{formatRupiah(psOmset)}</div>
-                  <div className="text-[11px] text-emerald-700 font-bold">Laba: +{formatRupiah(psLaba)}</div>
+                  <div className="text-xs text-emerald-700 font-bold">Laba: +{formatRupiah(psLaba)}</div>
                 </div>
               </div>
 
@@ -526,12 +588,12 @@ export const ReportView: React.FC = () => {
                   </div>
                   <div>
                     <div className="font-bold text-indigo-950">PPOB (Range DANA/GoPay & Pulsa/Game)</div>
-                    <div className="text-[11px] text-indigo-800">{catPPOBRange.length + catPPOBLain.length} transaksi topup & transfer</div>
+                    <div className="text-xs text-indigo-800">{catPPOBRange.length + catPPOBLain.length} transaksi topup & transfer</div>
                   </div>
                 </div>
                 <div className="text-right font-mono">
                   <div className="font-bold text-indigo-950 text-sm">{formatRupiah(ppobOmset)}</div>
-                  <div className="text-[11px] text-emerald-700 font-bold">Admin: +{formatRupiah(ppobLaba)}</div>
+                  <div className="text-xs text-emerald-700 font-bold">Admin: +{formatRupiah(ppobLaba)}</div>
                 </div>
               </div>
 
@@ -543,12 +605,12 @@ export const ReportView: React.FC = () => {
                   </div>
                   <div>
                     <div className="font-bold text-emerald-950">Barang & Makanan Toko</div>
-                    <div className="text-[11px] text-emerald-800">{catBarang.length} transaksi kasir retail</div>
+                    <div className="text-xs text-emerald-800">{catBarang.length} transaksi kasir retail</div>
                   </div>
                 </div>
                 <div className="text-right font-mono">
                   <div className="font-bold text-emerald-950 text-sm">{formatRupiah(barangOmset)}</div>
-                  <div className="text-[11px] text-emerald-700 font-bold">Laba: +{formatRupiah(barangLaba)}</div>
+                  <div className="text-xs text-emerald-700 font-bold">Laba: +{formatRupiah(barangLaba)}</div>
                 </div>
               </div>
             </div>
@@ -561,11 +623,11 @@ export const ReportView: React.FC = () => {
               <span>Arus Kas Berdasarkan Metode Bayar</span>
             </h3>
 
-            <div className="space-y-2.5 text-xs">
+            <div className="space-y-2.5 text-xs md:text-sm">
               <div className="p-3.5 rounded-xl border border-emerald-200/80 bg-emerald-50/60 flex justify-between items-center">
                 <div>
                   <span className="font-bold text-emerald-950">Pembayaran Tunai (Cash)</span>
-                  <p className="text-[11px] text-emerald-800">Uang fisik langsung masuk laci kasir toko</p>
+                  <p className="text-xs text-emerald-800">Uang fisik langsung masuk laci kasir toko</p>
                 </div>
                 <span className="font-mono font-bold text-base text-emerald-950">
                   {formatRupiah(tunaiTotal)}
@@ -575,7 +637,7 @@ export const ReportView: React.FC = () => {
               <div className="p-3.5 rounded-xl border border-sky-200/80 bg-sky-50/60 flex justify-between items-center">
                 <div>
                   <span className="font-bold text-sky-950">Digital (QRIS & Transfer Bank)</span>
-                  <p className="text-[11px] text-sky-800">QRIS: {formatRupiah(qrisTotal)} · Bank: {formatRupiah(trfTotal)}</p>
+                  <p className="text-xs text-sky-800">QRIS: {formatRupiah(qrisTotal)} · Bank: {formatRupiah(trfTotal)}</p>
                 </div>
                 <span className="font-mono font-bold text-base text-sky-950">
                   {formatRupiah(qrisTotal + trfTotal)}
@@ -585,7 +647,7 @@ export const ReportView: React.FC = () => {
               <div className="p-3.5 rounded-xl border border-rose-200/80 bg-rose-50/60 flex justify-between items-center">
                 <div>
                   <span className="font-bold text-rose-950">Kasbon / Piutang Belum Bayar</span>
-                  <p className="text-[11px] text-rose-800">{filteredDebts.length} catatan hutang pada periode ini</p>
+                  <p className="text-xs text-rose-800">{filteredDebts.length} catatan hutang pada periode ini</p>
                 </div>
                 <span className="font-mono font-bold text-base text-rose-900">
                   {formatRupiah(hutangTotal)}
@@ -596,7 +658,7 @@ export const ReportView: React.FC = () => {
               <div className="p-3.5 rounded-xl border border-amber-200/80 bg-amber-50/60 flex justify-between items-center">
                 <div>
                   <span className="font-bold text-amber-950">Total Pengeluaran Kas (Beban)</span>
-                  <p className="text-[11px] text-amber-800">Biaya operasional & belanja stok usaha</p>
+                  <p className="text-xs text-amber-800">Biaya operasional & belanja stok usaha</p>
                 </div>
                 <span className="font-mono font-bold text-base text-amber-950">
                   -{formatRupiah(totalPengeluaran)}
@@ -664,7 +726,7 @@ export const ReportView: React.FC = () => {
                   </tr>
                 ) : (
                   tableTransactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors">
+                    <tr key={`report-tx-${tx.id}`} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-2.5 px-3 font-bold text-slate-900">{tx.nomorStruk}</td>
                       <td className="py-2.5 px-3 text-slate-500 font-sans text-[11px] whitespace-nowrap">
                         {formatDateTime(tx.waktu)}
@@ -825,6 +887,197 @@ export const ReportView: React.FC = () => {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Print Preview Modal */}
+      {showPrintPreview && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">Pratinjau Cetak Rekap Laporan</h3>
+                <p className="text-xs text-slate-500">Periode: {startDate || 'Semua'} s.d. {endDate || 'Semua'}</p>
+              </div>
+              <button
+                onClick={() => setShowPrintPreview(false)}
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold p-1 rounded-lg bg-slate-100 dark:bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Print Preview Content */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-4 text-xs font-mono text-slate-800 dark:text-slate-200">
+              <div className="text-center space-y-1">
+                <div className="font-bold text-sm uppercase">{settings.namaToko || 'POS Usaha Terpadu'}</div>
+                <div className="text-[11px] text-slate-500">{settings.alamat || 'Alamat Toko'} · Tel: {settings.noTelepon || '-'}</div>
+                <div className="font-bold text-slate-700 dark:text-slate-300 mt-2">REKAPITULASI LAPORAN KEUANGAN & LABA RUGI</div>
+                <div className="text-[11px] text-slate-500">Periode: {startDate} s.d. {endDate}</div>
+              </div>
+
+              <div className="border-t border-dashed border-slate-300 dark:border-slate-700 pt-3 space-y-2">
+                <div className="flex justify-between font-semibold">
+                  <span>Total Omset Penjualan:</span>
+                  <span>{formatRupiah(totalOmset)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                  <span>Total Modal (HPP):</span>
+                  <span>{formatRupiah(totalModal)}</span>
+                </div>
+                <div className="flex justify-between font-semibold text-emerald-600">
+                  <span>Laba Kotor:</span>
+                  <span>{formatRupiah(labaKotor)}</span>
+                </div>
+                <div className="flex justify-between text-rose-600">
+                  <span>Total Beban Pengeluaran:</span>
+                  <span>{formatRupiah(totalPengeluaran)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-teal-700 dark:text-teal-400 text-sm pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <span>Laba Bersih Riil:</span>
+                  <span>{formatRupiah(labaBersih)}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-dashed border-slate-300 dark:border-slate-700 pt-3 space-y-1 text-[11px] text-slate-500">
+                <div>Jumlah Transaksi: {filteredTxs.length} struk</div>
+                <div>Metode Bayar - Tunai: {formatRupiah(tunaiTotal)} | QRIS: {formatRupiah(qrisTotal)} | Transfer: {formatRupiah(trfTotal)} | Kasbon: {formatRupiah(hutangTotal)}</div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowPrintPreview(false)}
+                className="py-2 px-4 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  setShowPrintPreview(false);
+                  window.print();
+                }}
+                className="py-2 px-4 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-1.5"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Cetak Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Preview Modal */}
+      {showPdfPreview && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">Pratinjau Ekspor PDF & Lampiran Transaksi</h3>
+                <p className="text-xs text-slate-500">Periode: {formatDate(startDate)} s.d. {formatDate(endDate)}</p>
+              </div>
+              <button
+                onClick={() => setShowPdfPreview(false)}
+                className="text-slate-400 hover:text-slate-700 text-sm font-bold p-1 rounded-lg bg-slate-100 dark:bg-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* PDF Document Container for Export */}
+            <div ref={pdfRef} className="p-6 bg-white text-slate-900 rounded-xl space-y-5 text-xs font-mono shadow-xs border border-slate-200">
+              {/* Store Header */}
+              <div className="text-center space-y-1 pb-4 border-b border-slate-300">
+                <div className="font-bold text-base uppercase">{settings.namaToko || 'POS Usaha Terpadu'}</div>
+                <div className="text-[11px] text-slate-600">{settings.alamat || 'Alamat Toko'} · Tel: {settings.noTelepon || '-'}</div>
+                <div className="font-bold text-slate-800 mt-2 text-sm">REKAPITULASI LAPORAN KEUANGAN & LAMPIRAN TRANSAKSI</div>
+                <div className="text-[11px] text-slate-600">Periode: {formatDate(startDate)} s.d. {formatDate(endDate)}</div>
+              </div>
+
+              {/* Summary Section */}
+              <div className="space-y-2 pb-4 border-b border-slate-300">
+                <div className="font-bold text-slate-900 text-xs mb-1">1. RINGKASAN KEUANGAN</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-700">
+                  <div className="flex justify-between"><span>Total Omset:</span> <span className="font-bold">{formatRupiah(totalOmset)}</span></div>
+                  <div className="flex justify-between"><span>Total HPP:</span> <span>{formatRupiah(totalModal)}</span></div>
+                  <div className="flex justify-between text-emerald-700"><span>Laba Kotor:</span> <span className="font-bold">{formatRupiah(labaKotor)}</span></div>
+                  <div className="flex justify-between text-rose-700"><span>Beban Pengeluaran:</span> <span>{formatRupiah(totalPengeluaran)}</span></div>
+                  <div className="flex justify-between font-bold text-teal-800 col-span-2 pt-1 border-t border-slate-200">
+                    <span>Laba Bersih Riil:</span>
+                    <span>{formatRupiah(labaBersih)}</span>
+                  </div>
+                </div>
+                <div className="text-[10px] text-slate-600 pt-1">
+                  Metode Bayar: Tunai ({formatRupiah(tunaiTotal)}) · QRIS ({formatRupiah(qrisTotal)}) · Transfer ({formatRupiah(trfTotal)}) · Kasbon ({formatRupiah(hutangTotal)})
+                </div>
+              </div>
+
+              {/* Transaction Appendix Section */}
+              <div className="space-y-2">
+                <div className="font-bold text-slate-900 text-xs flex justify-between items-center">
+                  <span>2. LAMPIRAN DETAIL TRANSAKSI ({filteredTxs.length} Struk)</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Sesuai Periode Laporan</span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-[9px] border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 border-b border-slate-300 text-slate-800">
+                        <th className="p-1 font-bold">No</th>
+                        <th className="p-1 font-bold">ID / Waktu</th>
+                        <th className="p-1 font-bold">Kasir</th>
+                        <th className="p-1 font-bold">Pelanggan</th>
+                        <th className="p-1 font-bold">Item Ringkas</th>
+                        <th className="p-1 font-bold">Bayar</th>
+                        <th className="p-1 font-bold text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {filteredTxs.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="p-2 text-center text-slate-500 italic">Tidak ada transaksi pada periode ini.</td>
+                        </tr>
+                      ) : (
+                        filteredTxs.map((tx, idx) => (
+                          <tr key={`report-tx-detail-${tx.id}`} className="hover:bg-slate-50">
+                            <td className="p-1 text-slate-500">{idx + 1}</td>
+                            <td className="p-1 font-mono">
+                              <div className="font-bold">{tx.nomorStruk}</div>
+                              <div className="text-[8px] text-slate-500">{formatDateTime(tx.waktu)}</div>
+                            </td>
+                            <td className="p-1">{tx.kasirName || 'Kasir'}</td>
+                            <td className="p-1">{tx.namaPelanggan || 'Umum'}</td>
+                            <td className="p-1 max-w-[150px] truncate">
+                              {tx.items.map(i => `${i.nama} (${i.qty}x)`).join(', ')}
+                            </td>
+                            <td className="p-1 uppercase">{tx.metodePembayaran}</td>
+                            <td className="p-1 text-right font-bold">{formatRupiah(tx.totalJual)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowPdfPreview(false)}
+                className="py-2 px-4 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleDownloadPdf}
+                disabled={isExportingPdf}
+                className="py-2 px-4 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{isExportingPdf ? 'Membuat PDF...' : 'Download PDF'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

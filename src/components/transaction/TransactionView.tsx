@@ -142,7 +142,7 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Date Picker Controls */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+            <span className="text-xs md:text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-emerald-600" />
               <span>Rentang Tanggal:</span>
             </span>
@@ -152,14 +152,14 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                className="px-3 py-2 text-xs md:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
               />
               <span className="text-xs text-slate-400">s/d</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
+                className="px-3 py-2 text-xs md:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
               />
             </div>
           </div>
@@ -168,38 +168,38 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={setPresetToday}
-              className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
+              className={`px-3 py-1.5 text-xs md:text-sm rounded-xl font-semibold transition-colors ${
                 startDate === getTodayStr() && endDate === getTodayStr()
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
               Hari Ini
             </button>
             <button
               onClick={setPresetYesterday}
-              className="px-2.5 py-1 text-xs rounded-lg font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+              className="px-3 py-1.5 text-xs md:text-sm rounded-xl font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors"
             >
               Kemarin
             </button>
             <button
               onClick={setPresetLast7Days}
-              className="px-2.5 py-1 text-xs rounded-lg font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+              className="px-3 py-1.5 text-xs md:text-sm rounded-xl font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors"
             >
               7 Hari Terakhir
             </button>
             <button
               onClick={setPresetThisMonth}
-              className="px-2.5 py-1 text-xs rounded-lg font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+              className="px-3 py-1.5 text-xs md:text-sm rounded-xl font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors"
             >
               Bulan Ini
             </button>
             <button
               onClick={setPresetAll}
-              className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
+              className={`px-3 py-1.5 text-xs md:text-sm rounded-xl font-semibold transition-colors ${
                 !startDate && !endDate
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
               Semua
@@ -210,13 +210,13 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
         {/* Secondary Search & Category Filter Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
           <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Cari no struk, item, pelanggan..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="w-full pl-9 pr-3 py-2 text-xs md:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>
 
@@ -224,7 +224,7 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="w-full px-3 py-2 text-xs md:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
             >
               <option value="all">Semua Kategori</option>
               <option value="ppob_range">PPOB Range (Transfer/Topup Saldo)</option>
@@ -239,10 +239,11 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              className="w-full px-3 py-2 text-xs md:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
             >
               <option value="all">Semua Status Bayar</option>
               <option value="lunas">Lunas (Tunai, QRIS, Trf)</option>
+              <option value="sebagian">Bayar Sebagian (DP)</option>
               <option value="hutang">Hutang / Kasbon</option>
             </select>
           </div>
@@ -256,44 +257,44 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
           <div className="text-lg sm:text-2xl font-bold text-indigo-950 dark:text-white font-mono mt-1">
             {filteredTransactions.length} Struk
           </div>
-          <span className="text-[10px] text-indigo-700/70 dark:text-slate-500 font-medium">Sesuai rentang tanggal aktif</span>
+          <span className="text-xs text-indigo-700/80 dark:text-slate-400 font-medium">Sesuai rentang tanggal aktif</span>
         </div>
         <div className="bg-emerald-50/80 dark:bg-slate-900 border border-emerald-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
-          <span className="text-xs font-semibold text-emerald-800 dark:text-slate-400">Total Omset Filter</span>
+          <span className="text-xs md:text-sm font-semibold text-emerald-800 dark:text-slate-400">Total Omset Filter</span>
           <div className="text-lg sm:text-2xl font-bold text-emerald-950 dark:text-white font-mono mt-1">
             {formatRupiah(totalOmsetFiltered)}
           </div>
-          <span className="text-[10px] text-emerald-700/70 dark:text-slate-500 font-medium">Bruto penerimaan penjualan</span>
+          <span className="text-xs text-emerald-700/80 dark:text-slate-400 font-medium">Bruto penerimaan penjualan</span>
         </div>
         <div className="bg-sky-50/80 dark:bg-slate-900 border border-sky-200/80 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
-          <span className="text-xs font-semibold text-sky-800 dark:text-slate-400">Total Laba Kotor</span>
+          <span className="text-xs md:text-sm font-semibold text-sky-800 dark:text-slate-400">Total Laba Kotor</span>
           <div className="text-lg sm:text-2xl font-bold text-sky-950 dark:text-white font-mono mt-1">
             {formatRupiah(totalLabaFiltered)}
           </div>
-          <span className="text-[10px] text-sky-700/70 dark:text-slate-500 font-medium">Omset dikurangi modal HPP</span>
+          <span className="text-xs text-sky-700/80 dark:text-slate-400 font-medium">Omset dikurangi modal HPP</span>
         </div>
       </div>
 
       {/* TRANSACTION LIST TABLE */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-xs md:text-sm">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold">
-                <th className="py-3 px-3 sm:px-4">No. Struk & Waktu</th>
-                <th className="py-3 px-3">Kategori</th>
-                <th className="py-3 px-3">Rincian Item</th>
-                <th className="py-3 px-3 text-right">Modal</th>
-                <th className="py-3 px-3 text-right">Total Jual</th>
-                <th className="py-3 px-3 text-right">Laba</th>
-                <th className="py-3 px-3 text-center">Status</th>
-                <th className="py-3 px-3 text-center">Aksi</th>
+              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold">
+                <th className="py-3.5 px-3 sm:px-4">No. Struk & Waktu</th>
+                <th className="py-3.5 px-3">Kategori</th>
+                <th className="py-3.5 px-3">Rincian Item</th>
+                <th className="py-3.5 px-3 text-right">Modal</th>
+                <th className="py-3.5 px-3 text-right">Total Jual</th>
+                <th className="py-3.5 px-3 text-right">Laba</th>
+                <th className="py-3.5 px-3 text-center">Status</th>
+                <th className="py-3.5 px-3 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400 text-xs">
+                  <td colSpan={8} className="py-12 text-center text-slate-400 text-sm">
                     Tidak ada transaksi ditemukan pada rentang tanggal ini.
                   </td>
                 </tr>
@@ -301,86 +302,93 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
                 filteredTransactions.map((tx) => (
                   <tr key={tx.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                     {/* No Struk & Waktu */}
-                    <td className="py-3 px-3 sm:px-4">
-                      <div className="font-mono font-bold text-slate-800 dark:text-white">
+                    <td className="py-3.5 px-3 sm:px-4">
+                      <div className="font-mono font-bold text-sm text-slate-900 dark:text-white">
                         {tx.nomorStruk}
                       </div>
-                      <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                        <Clock className="w-3 h-3" />
+                      <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                        <Clock className="w-3.5 h-3.5" />
                         <span>{formatDateTime(tx.waktu)}</span>
                       </div>
-                      <div className="text-[10px] text-slate-500">Kasir: {tx.kasirName}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">Kasir: {tx.kasirName}</div>
                     </td>
 
                     {/* Kategori Badge */}
-                    <td className="py-3 px-3 whitespace-nowrap">
+                    <td className="py-3.5 px-3 whitespace-nowrap">
                       {tx.kategoriUtama === 'ppob_range' && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/80">
                           PPOB Range
                         </span>
                       )}
                       {tx.kategoriUtama === 'ppob_lain' && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300">
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-cyan-200/80">
                           PPOB Lainnya
                         </span>
                       )}
                       {tx.kategoriUtama === 'barang' && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/80">
                           Barang Toko
                         </span>
                       )}
                       {tx.kategoriUtama === 'bbm' && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300">
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300 border border-orange-200/80">
                           BBM
                         </span>
                       )}
                       {tx.kategoriUtama === 'rental_ps' && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200/80">
                           Rental PS
                         </span>
                       )}
                     </td>
 
                     {/* Rincian Item */}
-                    <td className="py-3 px-3 max-w-[220px]">
-                      <div className="font-medium text-slate-800 dark:text-slate-200">
+                    <td className="py-3.5 px-3 max-w-[220px]">
+                      <div className="font-semibold text-sm text-slate-800 dark:text-slate-200">
                         {tx.items[0]?.nama} {tx.items[0] && tx.items[0].qty > 1 && `(${tx.items[0].qty}x)`}
                       </div>
                       {tx.items.length > 1 && (
-                        <div className="text-[10px] text-slate-500">
+                        <div className="text-xs text-slate-500 mt-0.5">
                           +{tx.items.length - 1} item lainnya
                         </div>
                       )}
                       {tx.namaPelanggan && (
-                        <div className="text-[10px] text-slate-400 mt-0.5">
-                          Pelanggan: <span className="font-semibold">{tx.namaPelanggan}</span>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          Pelanggan: <span className="font-semibold text-slate-700 dark:text-slate-300">{tx.namaPelanggan}</span>
                         </div>
                       )}
                     </td>
 
                     {/* Modal */}
-                    <td className="py-3 px-3 text-right font-mono text-slate-500">
+                    <td className="py-3.5 px-3 text-right font-mono text-sm text-slate-500">
                       {formatRupiah(tx.totalModal)}
                     </td>
 
                     {/* Total Jual */}
-                    <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
+                    <td className="py-3.5 px-3 text-right font-mono font-bold text-sm text-slate-900 dark:text-white">
                       {formatRupiah(tx.totalJual)}
                     </td>
 
                     {/* Laba */}
-                    <td className="py-3 px-3 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                    <td className="py-3.5 px-3 text-right font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400">
                       +{formatRupiah(tx.totalLaba)}
                     </td>
 
                     {/* Status Bayar */}
-                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                    <td className="py-3.5 px-3 text-center whitespace-nowrap">
                       {tx.statusPembayaran === 'lunas' ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200">
                           LUNAS · {tx.metodePembayaran.toUpperCase()}
                         </span>
+                      ) : tx.statusPembayaran === 'sebagian' ? (
+                        <span
+                          className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300"
+                          title={`Dibayar: ${formatRupiah(tx.jumlahBayar || 0)} · Sisa Piutang: ${formatRupiah(tx.sisaHutang || 0)}`}
+                        >
+                          SEBAGIAN (Sisa {formatRupiah(tx.sisaHutang || 0)})
+                        </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200">
                           HUTANG
                         </span>
                       )}
@@ -399,7 +407,7 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
                         <button
                           onClick={() => setTxToDelete(tx)}
                           title="Hapus Transaksi"
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                          className="p-1.5 text-rose-600 hover:text-rose-700 dark:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

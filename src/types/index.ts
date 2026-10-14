@@ -7,11 +7,12 @@ export interface UserAccount {
   name: string;
   role: UserRole;
   email?: string;
+  isActive?: boolean;
   createdAt: string;
 }
 
 export type TransactionCategory = 'ppob_range' | 'ppob_lain' | 'barang' | 'bbm' | 'rental_ps';
-export type PaymentStatus = 'lunas' | 'hutang';
+export type PaymentStatus = 'lunas' | 'hutang' | 'sebagian';
 export type PaymentMethod = 'tunai' | 'qris' | 'transfer' | 'hutang';
 
 export interface TransactionItem {
@@ -39,6 +40,8 @@ export interface Transaction {
   totalLaba: number;
   metodePembayaran: PaymentMethod;
   statusPembayaran: PaymentStatus;
+  jumlahBayar?: number; // Jumlah yang dibayar pelanggan (untuk bayar sebagian)
+  sisaHutang?: number; // Sisa piutang yang belum dibayar
   namaPelanggan?: string;
   noHpPelanggan?: string;
   catatan?: string;
@@ -116,7 +119,9 @@ export interface MasterBarang {
 export interface MasterBBM {
   id: string;
   jenisBBM: string; // Pertalite, Pertamax, Solar, Dexlite
-  hargaPerLiter: number;
+  hargaBeli: number;
+  hargaJual: number;
+  hargaPerLiter?: number;
   stokLiter: number;
 }
 
@@ -148,6 +153,19 @@ export interface PSRentalSession {
   tambahanItem: TransactionItem[];
   totalBiaya: number;
   status: 'aktif' | 'selesai' | 'dibatalkan';
+  kasirName: string;
+  metodeBayar?: string;
+  statusBayar?: 'lunas' | 'belum_bayar';
+}
+
+export interface PSSisaWaktuRecord {
+  id: string;
+  namaPelanggan: string;
+  namaUnit: string;
+  sisaMenit: number;
+  waktuSimpan: string;
+  sudahDigunakan: boolean;
+  catatan?: string;
   kasirName: string;
 }
 

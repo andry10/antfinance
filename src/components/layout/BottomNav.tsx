@@ -112,12 +112,12 @@ export const BottomNav: React.FC = () => {
                         <Icon className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="text-xs font-bold">{item.label}</div>
-                        <div className="text-[10px] text-slate-500">{item.desc}</div>
+                        <div className="text-xs md:text-sm font-bold">{item.label}</div>
+                        <div className="text-xs text-slate-500">{item.desc}</div>
                       </div>
                     </div>
                     {item.badge && (
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.badgeColor}`}>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${item.badgeColor}`}>
                         {item.badge}
                       </span>
                     )}
@@ -157,12 +157,12 @@ export const BottomNav: React.FC = () => {
               <div className="relative">
                 <Icon className="w-5 h-5" />
                 {tab.badge !== null && (
-                  <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-2 bg-rose-500 text-white text-xs font-bold w-4 h-4 rounded-full flex items-center justify-center">
                     {tab.badge}
                   </span>
                 )}
               </div>
-              <span className="text-[11px] mt-1 tracking-tight">{tab.label}</span>
+              <span className="text-xs font-medium mt-1 tracking-tight">{tab.label}</span>
             </button>
           );
         })}

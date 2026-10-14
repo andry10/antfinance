@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { formatRupiah, formatNumber } from '../../utils/format';
+import { formatRupiah, formatNumber, formatThousandInput, parseThousandInput } from '../../utils/format';
 import {
   Database,
   Zap,
@@ -30,7 +30,7 @@ export const MasterDataView: React.FC = () => {
     updateBarang,
     deleteBarang,
     bbmList,
-    updateBbmPriceAndStock,
+    updateBbmPricesAndStock,
     psUnits,
     addPsUnit,
     updatePsUnit,
@@ -50,12 +50,12 @@ export const MasterDataView: React.FC = () => {
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">
           Akses Master Data Dibatasi
         </h2>
-        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+        <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
           Akun Anda memiliki hak akses sebagai <strong>Kasir</strong>. Sesuai kebijakan sistem, kasir hanya memiliki izin untuk mencatat transaksi dan melihat laporan. Pengelolaan data barang, PPOB, BBM, dan tarif rental hanya dapat diakses oleh <strong>Owner (Pemilik Toko)</strong>.
         </p>
         <button
           onClick={() => setGlobalActiveTab('transaksi')}
-          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs"
+          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs md:text-sm shadow-xs cursor-pointer"
         >
           Beralih ke Menu Transaksi
         </button>
@@ -76,9 +76,9 @@ export const MasterDataView: React.FC = () => {
     if (!rangeNamaLayanan || !rangeMinNominal || !rangeMaxNominal || !rangeBiayaAdmin) return;
     addPpobRange({
       namaLayanan: rangeNamaLayanan.trim(),
-      minNominal: Number(rangeMinNominal),
-      maxNominal: Number(rangeMaxNominal),
-      biayaAdmin: Number(rangeBiayaAdmin)
+      minNominal: parseThousandInput(rangeMinNominal),
+      maxNominal: parseThousandInput(rangeMaxNominal),
+      biayaAdmin: parseThousandInput(rangeBiayaAdmin)
     });
     setRangeMinNominal('');
     setRangeMaxNominal('');
@@ -99,8 +99,8 @@ export const MasterDataView: React.FC = () => {
     addPpobLain({
       namaLayanan: lainNamaLayanan.trim(),
       kategori: lainKategori,
-      hargaModal: Number(lainHargaModal),
-      hargaJual: Number(lainHargaJual)
+      hargaModal: parseThousandInput(lainHargaModal),
+      hargaJual: parseThousandInput(lainHargaJual)
     });
     setLainNamaLayanan('');
     setLainHargaModal('');
@@ -129,8 +129,8 @@ export const MasterDataView: React.FC = () => {
         satuan: barangSatuan,
         stok: Number(barangStok) || 0,
         stokMinimum: Number(barangStokMin) || 0,
-        hargaModal: Number(barangModal),
-        hargaJual: Number(barangJual)
+        hargaModal: parseThousandInput(barangModal),
+        hargaJual: parseThousandInput(barangJual)
       });
       setEditingBarang(null);
     } else {
@@ -139,8 +139,8 @@ export const MasterDataView: React.FC = () => {
         satuan: barangSatuan,
         stok: Number(barangStok) || 0,
         stokMinimum: Number(barangStokMin) || 0,
-        hargaModal: Number(barangModal),
-        hargaJual: Number(barangJual)
+        hargaModal: parseThousandInput(barangModal),
+        hargaJual: parseThousandInput(barangJual)
       });
     }
 
@@ -156,8 +156,8 @@ export const MasterDataView: React.FC = () => {
     setBarangSatuan(b.satuan);
     setBarangStok(b.stok.toString());
     setBarangStokMin(b.stokMinimum.toString());
-    setBarangModal(b.hargaModal.toString());
-    setBarangJual(b.hargaJual.toString());
+    setBarangModal(formatThousandInput(b.hargaModal));
+    setBarangJual(formatThousandInput(b.hargaJual));
   };
 
   // ==========================================
@@ -166,7 +166,7 @@ export const MasterDataView: React.FC = () => {
   const [psKode, setPsKode] = useState('');
   const [psNama, setPsNama] = useState('');
   const [psTipe, setPsTipe] = useState<'PS3' | 'PS4' | 'PS5'>('PS4');
-  const [psTarif, setPsTarif] = useState('');
+  const [psTarif, setPsTarif] = useState('6.000');
 
   const handleAddPs = (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,12 +175,12 @@ export const MasterDataView: React.FC = () => {
       kodeUnit: psKode.trim(),
       namaUnit: psNama.trim(),
       tipeKonsol: psTipe,
-      tarifPerJam: Number(psTarif),
+      tarifPerJam: parseThousandInput(psTarif),
       status: 'tersedia'
     });
     setPsKode('');
     setPsNama('');
-    setPsTarif('');
+    setPsTarif('6.000');
   };
 
   return (
@@ -273,52 +273,58 @@ export const MasterDataView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs md:text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Nominal Min (Rp):
                   </label>
                   <input
-                    type="number"
-                    placeholder="10000"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="10.000"
                     value={rangeMinNominal}
-                    onChange={(e) => setRangeMinNominal(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
+                    onChange={(e) => setRangeMinNominal(formatThousandInput(e.target.value))}
+                    className="w-full px-3 py-2 text-xs md:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs md:text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Nominal Max (Rp):
                   </label>
                   <input
-                    type="number"
-                    placeholder="100000"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="100.000"
                     value={rangeMaxNominal}
-                    onChange={(e) => setRangeMaxNominal(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
+                    onChange={(e) => setRangeMaxNominal(formatThousandInput(e.target.value))}
+                    className="w-full px-3 py-2 text-xs md:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs md:text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Biaya Admin (Rp):
                 </label>
                 <input
-                  type="number"
-                  placeholder="2000"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="2.000"
                   value={rangeBiayaAdmin}
-                  onChange={(e) => setRangeBiayaAdmin(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold"
+                  onChange={(e) => setRangeBiayaAdmin(formatThousandInput(e.target.value))}
+                  className="w-full px-3 py-2 text-xs md:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold"
                   required
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2 px-4 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white"
+                className="w-full py-2.5 px-4 rounded-xl text-xs md:text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-95"
               >
-                + Simpan Aturan Range
+                <span>+ Simpan Aturan Range</span>
+                <span className="hidden sm:inline-block text-[11px] font-mono bg-indigo-700 px-2 py-0.5 rounded text-indigo-100">
+                  Enter ↵
+                </span>
               </button>
             </form>
           </div>
@@ -406,26 +412,30 @@ export const MasterDataView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs md:text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Harga Modal (Rp):
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
                     value={lainHargaModal}
-                    onChange={(e) => setLainHargaModal(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
+                    onChange={(e) => setLainHargaModal(formatThousandInput(e.target.value))}
+                    className="w-full px-3 py-2 text-xs md:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs md:text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Harga Jual (Rp):
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
                     value={lainHargaJual}
-                    onChange={(e) => setLainHargaJual(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold"
+                    onChange={(e) => setLainHargaJual(formatThousandInput(e.target.value))}
+                    className="w-full px-3 py-2 text-xs md:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold"
                     required
                   />
                 </div>
@@ -433,9 +443,12 @@ export const MasterDataView: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full py-2 px-4 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-700 text-white"
+                className="w-full py-2.5 px-4 rounded-xl text-xs md:text-sm font-bold bg-cyan-600 hover:bg-cyan-700 text-white flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-95"
               >
-                + Simpan PPOB Lainnya
+                <span>+ Simpan PPOB Lainnya</span>
+                <span className="hidden sm:inline-block text-[11px] font-mono bg-cyan-700 px-2 py-0.5 rounded text-cyan-100">
+                  Enter ↵
+                </span>
               </button>
             </form>
           </div>
@@ -550,26 +563,30 @@ export const MasterDataView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs md:text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Harga Modal (Rp):
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
                     value={barangModal}
-                    onChange={(e) => setBarangModal(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
+                    onChange={(e) => setBarangModal(formatThousandInput(e.target.value))}
+                    className="w-full px-3 py-2 text-xs md:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs md:text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     Harga Jual (Rp):
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
                     value={barangJual}
-                    onChange={(e) => setBarangJual(e.target.value)}
-                    className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold"
+                    onChange={(e) => setBarangJual(formatThousandInput(e.target.value))}
+                    className="w-full px-3 py-2 text-xs md:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold"
                     required
                   />
                 </div>
@@ -586,16 +603,19 @@ export const MasterDataView: React.FC = () => {
                       setBarangModal('');
                       setBarangJual('');
                     }}
-                    className="px-3 py-2 text-xs rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600"
+                    className="px-4 py-2.5 text-xs md:text-sm font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer"
                   >
                     Batal
                   </button>
                 )}
                 <button
                   type="submit"
-                  className="flex-1 py-2 px-4 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="flex-1 py-2.5 px-4 rounded-xl text-xs md:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-95"
                 >
-                  {editingBarang ? 'Simpan Perubahan' : '+ Tambah Barang'}
+                  <span>{editingBarang ? 'Simpan Perubahan' : '+ Tambah Barang'}</span>
+                  <span className="hidden sm:inline-block text-[11px] font-mono bg-emerald-700 px-2 py-0.5 rounded text-emerald-100">
+                    Enter ↵
+                  </span>
                 </button>
               </div>
             </form>
@@ -603,8 +623,8 @@ export const MasterDataView: React.FC = () => {
 
           <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
             <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <h3 className="font-bold text-xs text-slate-800 dark:text-white">Daftar Stok Barang Toko</h3>
-              <span className="text-[11px] text-slate-400">Total {barangList.length} Barang</span>
+              <h3 className="font-bold text-xs md:text-sm text-slate-800 dark:text-white">Daftar Stok Barang Toko</h3>
+              <span className="text-xs text-slate-400">Total {barangList.length} Barang</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
@@ -625,15 +645,15 @@ export const MasterDataView: React.FC = () => {
                       <tr key={b.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
                         <td className="py-2.5 px-4">
                           <div className="font-semibold text-slate-900 dark:text-white">{b.nama}</div>
-                          <div className="text-[10px] text-slate-400">Satuan: {b.satuan} · Min: {b.stokMinimum}</div>
+                          <div className="text-xs text-slate-400">Satuan: {b.satuan} · Min: {b.stokMinimum}</div>
                         </td>
                         <td className="py-2.5 px-3 font-mono">
                           {isLow ? (
-                            <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200">
                               {b.stok} {b.satuan} (MENIPIS!)
                             </span>
                           ) : (
-                            <span className="text-slate-800 dark:text-slate-200 font-bold">
+                            <span className="text-slate-800 dark:text-slate-200 font-bold text-xs md:text-sm">
                               {b.stok} {b.satuan}
                             </span>
                           )}
@@ -692,36 +712,54 @@ export const MasterDataView: React.FC = () => {
                   </span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                    Harga Per Liter (Rp):
-                  </label>
-                  <input
-                    type="number"
-                    step="500"
-                    defaultValue={bbm.hargaPerLiter}
-                    onBlur={(e) => {
-                      const newPrice = Number(e.target.value);
-                      if (newPrice > 0) updateBbmPriceAndStock(bbm.id, newPrice, bbm.stokLiter);
-                    }}
-                    className="w-full px-3 py-2 text-base font-bold font-mono rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                  />
-                </div>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      Harga Beli / Modal (Rp / Liter):
+                    </label>
+                    <input
+                      type="number"
+                      step="500"
+                      defaultValue={bbm.hargaBeli}
+                      onBlur={(e) => {
+                        const newBeli = Number(e.target.value);
+                        if (newBeli > 0) updateBbmPricesAndStock(bbm.id, newBeli, bbm.hargaJual, bbm.stokLiter);
+                      }}
+                      className="w-full px-3 py-2 text-sm font-bold font-mono rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                    Sisa Stok Tangki (Liter):
-                  </label>
-                  <input
-                    type="number"
-                    step="1"
-                    defaultValue={bbm.stokLiter}
-                    onBlur={(e) => {
-                      const newStock = Number(e.target.value);
-                      if (newStock >= 0) updateBbmPriceAndStock(bbm.id, bbm.hargaPerLiter, newStock);
-                    }}
-                    className="w-full px-3 py-2 text-base font-bold font-mono rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-orange-600"
-                  />
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      Harga Jual / Isian (Rp / Liter):
+                    </label>
+                    <input
+                      type="number"
+                      step="500"
+                      defaultValue={bbm.hargaJual}
+                      onBlur={(e) => {
+                        const newJual = Number(e.target.value);
+                        if (newJual > 0) updateBbmPricesAndStock(bbm.id, bbm.hargaBeli, newJual, bbm.stokLiter);
+                      }}
+                      className="w-full px-3 py-2 text-base font-bold font-mono rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-orange-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                      Sisa Stok Tangki (Liter):
+                    </label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      defaultValue={bbm.stokLiter}
+                      onBlur={(e) => {
+                        const newStock = Number(e.target.value);
+                        if (newStock >= 0) updateBbmPricesAndStock(bbm.id, bbm.hargaBeli, bbm.hargaJual, newStock);
+                      }}
+                      className="w-full px-3 py-2 text-sm font-bold font-mono rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                    />
+                  </div>
                 </div>
               </div>
             ))}
@@ -781,37 +819,40 @@ export const MasterDataView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Tarif Sewa Per Jam (Rp):
+                <label className="block text-xs md:text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Tarif Sewa Per Jam (Rp) <span className="text-xs text-purple-600 font-normal">(Standar: 6.000 = Rp 3.000 / 30 mnt)</span>:
                 </label>
                 <input
-                  type="number"
-                  step="1000"
-                  placeholder="15000"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="6.000"
                   value={psTarif}
-                  onChange={(e) => setPsTarif(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold"
+                  onChange={(e) => setPsTarif(formatThousandInput(e.target.value))}
+                  className="w-full px-3 py-2 text-xs md:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold"
                   required
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2 px-4 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white"
+                className="w-full py-2.5 px-4 rounded-xl text-xs md:text-sm font-bold bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-95"
               >
-                + Tambah Unit PS
+                <span>+ Tambah Unit PS</span>
+                <span className="hidden sm:inline-block text-[11px] font-mono bg-purple-700 px-2 py-0.5 rounded text-purple-100">
+                  Enter ↵
+                </span>
               </button>
             </form>
           </div>
 
           <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
             <div className="p-3.5 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="font-bold text-xs text-slate-800 dark:text-white">Daftar Unit PlayStation</h3>
+              <h3 className="font-bold text-xs md:text-sm text-slate-800 dark:text-white">Daftar Unit PlayStation</h3>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full text-left border-collapse text-xs md:text-sm">
                 <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold">
+                  <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold">
                     <th className="py-2.5 px-4">Kode & Nama Unit</th>
                     <th className="py-2.5 px-3">Tipe</th>
                     <th className="py-2.5 px-3 text-right">Tarif / Jam</th>
@@ -824,14 +865,14 @@ export const MasterDataView: React.FC = () => {
                     <tr key={u.id}>
                       <td className="py-2.5 px-4">
                         <div className="font-bold text-slate-900 dark:text-white">{u.namaUnit}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{u.kodeUnit}</div>
+                        <div className="text-xs text-slate-400 font-mono">{u.kodeUnit}</div>
                       </td>
                       <td className="py-2.5 px-3 font-semibold text-purple-600">{u.tipeKonsol}</td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
                         {formatRupiah(u.tarifPerJam)}
                       </td>
                       <td className="py-2.5 px-3 text-center">
-                        <span className="capitalize px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                        <span className="capitalize px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                           {u.status.replace('_', ' ')}
                         </span>
                       </td>

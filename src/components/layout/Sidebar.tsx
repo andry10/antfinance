@@ -82,7 +82,7 @@ export const Sidebar: React.FC = () => {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all ${
                 isActive
                   ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200/80 dark:border-emerald-800 shadow-xs'
                   : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
@@ -93,7 +93,7 @@ export const Sidebar: React.FC = () => {
                 <span>{item.label}</span>
               </div>
               {item.badge !== null && (
-                <span className={`text-[10px] font-bold text-white px-2 py-0.5 rounded-full ${item.badgeColor}`}>
+                <span className={`text-xs font-bold text-white px-2 py-0.5 rounded-full ${item.badgeColor}`}>
                   {item.badge}
                 </span>
               )}
@@ -101,12 +101,6 @@ export const Sidebar: React.FC = () => {
           );
         })}
       </nav>
-
-      {/* Footer subtle brand note */}
-      <div className="p-4 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-400 dark:text-slate-500">
-        <p className="font-semibold text-slate-700 dark:text-slate-300">POS Usaha Terpadu</p>
-        <p className="text-[11px] mt-0.5 text-slate-400 dark:text-slate-500">Menu Tetap (Fixed Navigation)</p>
-      </div>
     </aside>
   );
 };

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
@@ -39,6 +39,15 @@ const MainLayout: React.FC = () => {
   const [selectedReceiptTx, setSelectedReceiptTx] = useState<Transaction | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [savedNotificationTx, setSavedNotificationTx] = useState<Transaction | null>(null);
+
+  useEffect(() => {
+    if (savedNotificationTx) {
+      const timer = setTimeout(() => {
+        setSavedNotificationTx(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [savedNotificationTx]);
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans flex flex-col antialiased">

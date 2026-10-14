@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { formatRupiah, formatDateTime, formatDate } from '../../utils/format';
+import { formatRupiah, formatDateTime, formatDate, formatThousandInput, parseThousandInput } from '../../utils/format';
 import { DebtRecord, PaymentMethod } from '../../types';
 import {
   CreditCard,
@@ -21,7 +21,7 @@ export const DebtView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'belum_lunas' | 'sebagian' | 'lunas'>('all');
 
-  // Modal Pay Debt States
+  // Modal Pay Debt States (formatted with thousand separator)
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState<DebtRecord | null>(null);
   const [payAmount, setPayAmount] = useState<string>('');
@@ -53,7 +53,7 @@ export const DebtView: React.FC = () => {
 
   const openPayModal = (debt: DebtRecord) => {
     setSelectedDebt(debt);
-    setPayAmount(debt.sisaHutang.toString());
+    setPayAmount(formatThousandInput(debt.sisaHutang));
     setPayMethod('tunai');
     setPayNote('');
     setIsPayModalOpen(true);
@@ -61,7 +61,7 @@ export const DebtView: React.FC = () => {
 
   const handleConfirmPayment = () => {
     if (!selectedDebt) return;
-    const amount = Number(payAmount) || 0;
+    const amount = parseThousandInput(payAmount);
     if (amount <= 0 || amount > selectedDebt.sisaHutang) {
       alert(`Nominal pembayaran harus antara Rp 1 s/d ${formatRupiah(selectedDebt.sisaHutang)}`);
       return;
@@ -90,11 +90,11 @@ export const DebtView: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-rose-50/80 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/60 rounded-2xl p-5 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-rose-800 dark:text-rose-300">Total Sisa Hutang Belum Lunas</span>
-            <div className="text-2xl font-bold font-mono text-rose-950 dark:text-white mt-1">
+            <span className="text-xs md:text-sm font-semibold text-rose-800 dark:text-rose-300">Total Sisa Hutang Belum Lunas</span>
+            <div className="text-2xl md:text-3xl font-bold font-mono text-rose-950 dark:text-white mt-1">
               {formatRupiah(totalSisaHutang)}
             </div>
-            <span className="text-[11px] text-rose-700/80 dark:text-rose-400 font-medium">Piutang kasbon pelanggan aktif</span>
+            <span className="text-xs text-rose-700/80 dark:text-rose-400 font-medium">Piutang kasbon pelanggan aktif</span>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 flex items-center justify-center shadow-xs">
             <CreditCard className="w-6 h-6" />
@@ -103,11 +103,11 @@ export const DebtView: React.FC = () => {
 
         <div className="bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-900/60 rounded-2xl p-5 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">Total Pembayaran / Cicilan Masuk</span>
-            <div className="text-2xl font-bold font-mono text-emerald-950 dark:text-white mt-1">
+            <span className="text-xs md:text-sm font-semibold text-emerald-800 dark:text-emerald-300">Total Pembayaran / Cicilan Masuk</span>
+            <div className="text-2xl md:text-3xl font-bold font-mono text-emerald-950 dark:text-white mt-1">
               {formatRupiah(totalSudahDibayar)}
             </div>
-            <span className="text-[11px] text-emerald-700/80 dark:text-emerald-400 font-medium">Uang pelunasan berhasil diterima</span>
+            <span className="text-xs text-emerald-700/80 dark:text-emerald-400 font-medium">Uang pelunasan berhasil diterima</span>
           </div>
           <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shadow-xs">
             <CheckCircle className="w-6 h-6" />
@@ -124,7 +124,7 @@ export const DebtView: React.FC = () => {
             placeholder="Cari nama pelanggan atau no HP..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+            className="w-full pl-9 pr-3 py-2 text-xs md:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-rose-500"
           />
         </div>
 
@@ -133,10 +133,10 @@ export const DebtView: React.FC = () => {
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg capitalize whitespace-nowrap transition-colors ${
+              className={`px-3 py-1.5 text-xs md:text-sm font-semibold rounded-xl capitalize whitespace-nowrap transition-colors ${
                 statusFilter === st
-                  ? 'bg-rose-600 text-white font-bold'
-                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  ? 'bg-rose-600 text-white font-bold shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
             >
               {st === 'all' ? 'Semua Hutang' : st.replace('_', ' ')}
@@ -148,89 +148,89 @@ export const DebtView: React.FC = () => {
       {/* Debt Table / List */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-xs md:text-sm">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold">
-                <th className="py-3 px-4">Nama Pelanggan</th>
-                <th className="py-3 px-3">No. Struk & Tanggal</th>
-                <th className="py-3 px-3">Jatuh Tempo</th>
-                <th className="py-3 px-3 text-right">Total Hutang</th>
-                <th className="py-3 px-3 text-right">Sudah Dibayar</th>
-                <th className="py-3 px-3 text-right">Sisa Hutang</th>
-                <th className="py-3 px-3 text-center">Status</th>
-                <th className="py-3 px-4 text-center">Aksi</th>
+              <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold">
+                <th className="py-3.5 px-4">Nama Pelanggan</th>
+                <th className="py-3.5 px-3">No. Struk & Tanggal</th>
+                <th className="py-3.5 px-3">Jatuh Tempo</th>
+                <th className="py-3.5 px-3 text-right">Total Hutang</th>
+                <th className="py-3.5 px-3 text-right">Sudah Dibayar</th>
+                <th className="py-3.5 px-3 text-right">Sisa Hutang</th>
+                <th className="py-3.5 px-3 text-center">Status</th>
+                <th className="py-3.5 px-4 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredDebts.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400 text-xs">
+                  <td colSpan={8} className="py-12 text-center text-slate-400 text-sm">
                     Tidak ada catatan hutang pelanggan.
                   </td>
                 </tr>
               ) : (
                 filteredDebts.map((debt) => (
-                  <tr key={debt.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                    <td className="py-3 px-4">
+                  <tr key={debt.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="py-3.5 px-4">
                       <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5 text-slate-400" />
+                        <User className="w-4 h-4 text-slate-400" />
                         <span>{debt.namaPelanggan}</span>
                       </div>
                       {debt.noHpPelanggan && (
-                        <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                          <Phone className="w-3 h-3" />
+                        <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                          <Phone className="w-3.5 h-3.5" />
                           <span>{debt.noHpPelanggan}</span>
                         </div>
                       )}
                     </td>
 
-                    <td className="py-3 px-3 font-mono">
-                      <div className="text-slate-700 dark:text-slate-300">{debt.nomorStruk}</div>
-                      <div className="text-[10px] text-slate-400">{formatDate(debt.tanggalTransaksi)}</div>
+                    <td className="py-3.5 px-3 font-mono">
+                      <div className="text-slate-800 dark:text-slate-200 font-bold">{debt.nomorStruk}</div>
+                      <div className="text-xs text-slate-400">{formatDate(debt.tanggalTransaksi)}</div>
                     </td>
 
-                    <td className="py-3 px-3 text-slate-600 dark:text-slate-300">
+                    <td className="py-3.5 px-3 text-slate-600 dark:text-slate-300">
                       {formatDate(debt.jatuhTempo)}
                     </td>
 
-                    <td className="py-3 px-3 text-right font-mono text-slate-500">
+                    <td className="py-3.5 px-3 text-right font-mono text-slate-500">
                       {formatRupiah(debt.totalHutang)}
                     </td>
 
-                    <td className="py-3 px-3 text-right font-mono text-emerald-600 font-semibold">
+                    <td className="py-3.5 px-3 text-right font-mono text-emerald-600 font-semibold">
                       {formatRupiah(debt.totalDibayar)}
                     </td>
 
-                    <td className="py-3 px-3 text-right font-mono font-bold text-rose-600 dark:text-rose-400 text-sm">
+                    <td className="py-3.5 px-3 text-right font-mono font-bold text-rose-600 dark:text-rose-400 text-sm md:text-base">
                       {formatRupiah(debt.sisaHutang)}
                     </td>
 
-                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                    <td className="py-3.5 px-3 text-center whitespace-nowrap">
                       {debt.status === 'lunas' ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200">
                           LUNAS
                         </span>
                       ) : debt.status === 'sebagian' ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200">
                           SEBAGIAN
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200">
                           BELUM LUNAS
                         </span>
                       )}
                     </td>
 
-                    <td className="py-3 px-4 text-center whitespace-nowrap">
+                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
                       {debt.status !== 'lunas' ? (
                         <button
                           onClick={() => openPayModal(debt)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-colors"
+                          className="px-3.5 py-2 rounded-xl text-xs md:text-sm font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-colors"
                         >
                           Bayar / Cicil
                         </button>
                       ) : (
-                        <span className="text-slate-400 text-xs font-semibold">Selesai</span>
+                        <span className="text-slate-400 text-xs md:text-sm font-semibold">Selesai</span>
                       )}
                     </td>
                   </tr>
@@ -243,100 +243,123 @@ export const DebtView: React.FC = () => {
 
       {/* MODAL BAYAR / CICIL HUTANG */}
       {isPayModalOpen && selectedDebt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in">
           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">
+              <h3 className="font-bold text-base md:text-lg text-slate-900 dark:text-white">
                 Pelunasan / Cicil Kasbon
               </h3>
-              <button onClick={() => setIsPayModalOpen(false)} className="text-slate-400 hover:text-slate-700">
+              <button
+                type="button"
+                onClick={() => setIsPayModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-1.5 text-xs">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Pelanggan:</span>
-                <span className="font-bold text-slate-800 dark:text-white">{selectedDebt.namaPelanggan}</span>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleConfirmPayment();
+              }}
+              className="space-y-4"
+            >
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-2 text-xs md:text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Pelanggan:</span>
+                  <span className="font-bold text-slate-800 dark:text-white">{selectedDebt.namaPelanggan}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Sisa Hutang:</span>
+                  <span className="font-mono font-bold text-rose-600 text-sm md:text-base">
+                    {formatRupiah(selectedDebt.sisaHutang)}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Sisa Hutang:</span>
-                <span className="font-mono font-bold text-rose-600 text-sm">
-                  {formatRupiah(selectedDebt.sisaHutang)}
-                </span>
-              </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Nominal Pembayaran (Rp):
-              </label>
-              <input
-                type="number"
-                value={payAmount}
-                onChange={(e) => setPayAmount(e.target.value)}
-                className="w-full px-3 py-2 text-base font-bold font-mono rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-              />
-              <div className="flex gap-2 mt-2">
+              {/* Input Nominal Pembayaran (ANGKA BESAR & TITIK RIBUAN OTOMATIS) */}
+              <div>
+                <label className="block text-xs md:text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Nominal Pembayaran (Rp):
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-lg font-black text-rose-500">
+                    Rp
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={payAmount}
+                    onChange={(e) => setPayAmount(formatThousandInput(e.target.value))}
+                    className="w-full pl-12 pr-4 py-3 text-2xl md:text-3xl font-mono font-black rounded-2xl border-2 border-rose-300 dark:border-rose-700 bg-white dark:bg-slate-800 text-rose-950 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500 shadow-sm transition-all"
+                  />
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setPayAmount(formatThousandInput(selectedDebt.sisaHutang))}
+                    className="px-3 py-1.5 text-xs md:text-sm rounded-xl bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-bold hover:bg-emerald-100 transition-colors"
+                  >
+                    Lunasi Penuh ({formatRupiah(selectedDebt.sisaHutang)})
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs md:text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Metode Pembayaran:
+                </label>
+                <div className="flex gap-2">
+                  {(['tunai', 'qris', 'transfer'] as PaymentMethod[]).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setPayMethod(m)}
+                      className={`flex-1 py-2 text-xs md:text-sm font-bold uppercase rounded-xl border transition-colors ${
+                        payMethod === m
+                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs md:text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  Catatan (Opsional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Cicilan transfer bank"
+                  value={payNote}
+                  onChange={(e) => setPayNote(e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs md:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setPayAmount(selectedDebt.sisaHutang.toString())}
-                  className="px-2.5 py-1 text-[11px] rounded bg-emerald-50 text-emerald-700 font-semibold"
+                  onClick={() => setIsPayModalOpen(false)}
+                  className="px-4 py-2 text-xs md:text-sm font-semibold rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
-                  Lunasi Penuh ({formatRupiah(selectedDebt.sisaHutang)})
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 text-xs md:text-sm font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-2 shadow-sm active:scale-95 cursor-pointer"
+                >
+                  <span>Simpan Pembayaran</span>
+                  <span className="hidden sm:inline text-[11px] font-mono bg-emerald-700/80 px-2 py-0.5 rounded text-emerald-100">
+                    Enter ↵
+                  </span>
                 </button>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Metode Pembayaran:
-              </label>
-              <div className="flex gap-2">
-                {(['tunai', 'qris', 'transfer'] as PaymentMethod[]).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setPayMethod(m)}
-                    className={`flex-1 py-1.5 text-xs font-bold uppercase rounded-lg border transition-colors ${
-                      payMethod === m
-                        ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Catatan (Opsional):
-              </label>
-              <input
-                type="text"
-                placeholder="Contoh: Cicilan transfer bank"
-                value={payNote}
-                onChange={(e) => setPayNote(e.target.value)}
-                className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-              />
-            </div>
-
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
-              <button
-                onClick={() => setIsPayModalOpen(false)}
-                className="px-4 py-2 text-xs rounded-xl text-slate-500"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleConfirmPayment}
-                className="px-5 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                Simpan Pembayaran
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       )}

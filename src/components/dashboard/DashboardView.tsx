@@ -139,7 +139,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
               <div className="text-lg md:text-2xl font-bold text-emerald-950 font-mono tabular-nums">
                 {formatRupiah(omsetHariIni)}
               </div>
-              <div className="text-[11px] text-emerald-700/80 mt-0.5 font-medium">
+              <div className="text-xs text-emerald-700/80 mt-1 font-medium">
                 {jumlahTransaksiHariIni} transaksi berhasil
               </div>
             </div>
@@ -157,7 +157,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
               <div className="text-lg md:text-2xl font-bold text-sky-950 font-mono tabular-nums">
                 {formatRupiah(labaKotorHariIni)}
               </div>
-              <div className="text-[11px] text-sky-700/80 mt-0.5 font-medium">
+              <div className="text-xs text-sky-700/80 mt-1 font-medium">
                 Total Omset - Modal
               </div>
             </div>
@@ -175,7 +175,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
               <div className="text-lg md:text-2xl font-bold font-mono tabular-nums text-teal-950">
                 {formatRupiah(labaBersihHariIni)}
               </div>
-              <div className="text-[11px] text-teal-700/80 mt-0.5 font-medium">
+              <div className="text-xs text-teal-700/80 mt-1 font-medium">
                 Dikurangi beban: {formatRupiah(totalPengeluaranHariIni)}
               </div>
             </div>
@@ -193,7 +193,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
               <div className="text-lg md:text-2xl font-bold text-indigo-950 font-mono tabular-nums">
                 {formatNumber(jumlahTransaksiHariIni)}
               </div>
-              <div className="text-[11px] text-indigo-700/80 mt-0.5 font-medium">
+              <div className="text-xs text-indigo-700/80 mt-1 font-medium">
                 Struk penjualan masuk
               </div>
             </div>
@@ -211,7 +211,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
               <div className="text-lg md:text-2xl font-bold text-rose-950 font-mono tabular-nums">
                 {formatRupiah(totalHutangPelanggan)}
               </div>
-              <div className="text-[11px] text-rose-700/80 mt-0.5 font-medium">
+              <div className="text-xs text-rose-700/80 mt-1 font-medium">
                 {debts.filter((d) => d.status !== 'lunas').length} pelanggan berhutang
               </div>
             </div>
@@ -229,7 +229,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
               <div className="text-lg md:text-2xl font-bold font-mono tabular-nums text-amber-950">
                 {jumlahStokMenipis} <span className="text-xs font-normal text-amber-800">item</span>
               </div>
-              <div className="text-[11px] text-amber-700/80 mt-0.5 font-medium">
+              <div className="text-xs text-amber-700/80 mt-1 font-medium">
                 Stok di bawah batas minimum
               </div>
             </div>
@@ -259,122 +259,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
         </div>
       </div>
 
-      {/* GOOGLE SHEET AUTO-SYNC & LAPORAN KEUANGAN (DUA CARD SOFT PASTEL) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* CARD 1: STATUS SINKRONISASI GOOGLE SHEET (Soft Sky Pastel) */}
-        <div className="bg-gradient-to-br from-sky-50 via-sky-50/70 to-blue-50/50 border border-sky-200/90 rounded-2xl p-4 md:p-5 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-2 border-b border-sky-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shadow-xs">
-                  <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-sky-950 flex items-center gap-1.5">
-                    <span>Sinkronisasi Google Sheet</span>
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                  </h3>
-                  <span className="text-[11px] font-semibold text-emerald-700">
-                    {googleUser ? '🟢 Auto-Sync Otomatis Aktif' : '🟡 Mode Lokal (Hubungkan Google)'}
-                  </span>
-                </div>
-              </div>
-            </div>
 
-            <p className="text-xs text-sky-900/80 mt-2.5 leading-relaxed">
-              <strong>Apakah data otomatis tersinkron? Ya!</strong> Setiap kali ada transaksi baru, cicilan hutang, atau pengeluaran, data otomatis tersimpan ke Google Spreadsheet di Google Drive Anda di latar belakang.
-            </p>
-
-            <div className="mt-2 text-[11px] text-sky-800 bg-white/70 border border-sky-100 rounded-lg px-2.5 py-1.5 flex items-center justify-between font-mono">
-              <span className="truncate">Status: {syncStatusMessage}</span>
-              {settings.lastSyncedAt && (
-                <span className="text-sky-600 shrink-0 ml-2">
-                  {new Date(settings.lastSyncedAt).toLocaleTimeString('id-ID')}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 mt-3 pt-2">
-            <button
-              onClick={() => triggerGoogleSheetSync()}
-              disabled={isSyncing}
-              className="flex-1 py-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkron Sekarang'}</span>
-            </button>
-
-            {settings.spreadsheetUrl && (
-              <a
-                href={settings.spreadsheetUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="py-2 px-3 rounded-xl bg-white hover:bg-sky-50 text-sky-800 border border-sky-200 text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all"
-              >
-                <span>Buka Sheet</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            )}
-          </div>
-        </div>
-
-        {/* CARD 2: LAPORAN KEUANGAN & REKAPITULASI (Soft Mint/Teal Pastel) */}
-        <div className="bg-gradient-to-br from-emerald-50 via-teal-50/70 to-emerald-50/50 border border-emerald-200/90 rounded-2xl p-4 md:p-5 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-2 border-b border-emerald-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shadow-xs">
-                  <FileText className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-emerald-950">Laporan Keuangan & Laba Rugi</h3>
-                  <span className="text-[11px] text-emerald-700 font-medium">Rekapitulasi lengkap hari ini & bulanan</span>
-                </div>
-              </div>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                Laporan Riil
-              </span>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 mt-3 text-center">
-              <div className="bg-white/80 p-2 rounded-xl border border-emerald-100">
-                <span className="text-[10px] text-slate-500 font-medium">Omset</span>
-                <div className="text-xs sm:text-sm font-bold text-emerald-900 font-mono">
-                  {formatRupiah(omsetHariIni)}
-                </div>
-              </div>
-              <div className="bg-white/80 p-2 rounded-xl border border-emerald-100">
-                <span className="text-[10px] text-slate-500 font-medium">Beban</span>
-                <div className="text-xs sm:text-sm font-bold text-rose-700 font-mono">
-                  {formatRupiah(totalPengeluaranHariIni)}
-                </div>
-              </div>
-              <div className="bg-white/80 p-2 rounded-xl border border-emerald-100">
-                <span className="text-[10px] text-slate-500 font-medium">Laba Bersih</span>
-                <div className="text-xs sm:text-sm font-bold text-teal-800 font-mono">
-                  {formatRupiah(labaBersihHariIni)}
-                </div>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-emerald-800/80 mt-2.5">
-              Lihat grafik arus kas (tunai, QRIS, kasbon), omset per lini usaha (BBM, PS, PPOB, Toko), dan cetak laporan PDF/CSV.
-            </p>
-          </div>
-
-          <div className="mt-3 pt-2">
-            <button
-              onClick={() => setActiveTab('laporan')}
-              className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Buka Menu Laporan Lengkap</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* LIVE RENTAL PS WIDGET ALERT (If any active) */}
       {activePsSessions.length > 0 && (
@@ -400,8 +285,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
                 </div>
                 <div className="text-right font-mono">
                   <div className="font-bold text-indigo-600 dark:text-indigo-400">{formatRupiah(sess.totalBiaya)}</div>
-                  <div className="text-[10px] text-slate-400 flex items-center gap-1 justify-end">
-                    <Clock className="w-3 h-3" />
+                  <div className="text-xs text-slate-400 flex items-center gap-1 justify-end font-mono">
+                    <Clock className="w-3.5 h-3.5" />
                     <span>{sess.durasiMenitTerhitung} mnt</span>
                   </div>
                 </div>
@@ -414,35 +299,35 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
       {/* 3 BLOK SEKURANG DI BAWAH KPI (WARNA-WARNI SOFT PASTEL): */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* BLOK 1: Riwayat Transaksi Dibatasi 5 Terbaru (Soft Emerald) */}
-        <div className="bg-gradient-to-b from-emerald-50/60 to-white border border-emerald-200/70 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+        <div className="bg-gradient-to-b from-emerald-50/60 to-white dark:from-slate-900 dark:to-slate-900/90 border border-emerald-200/70 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
+            <div className="flex items-center justify-between pb-3 border-b border-emerald-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
                   <Receipt className="w-3.5 h-3.5" />
                 </div>
-                <h3 className="font-bold text-sm text-emerald-950">
+                <h3 className="font-bold text-sm text-emerald-950 dark:text-white">
                   Riwayat Transaksi (5 Terbaru)
                 </h3>
               </div>
             </div>
 
-            <div className="divide-y divide-emerald-100/70 mt-2">
+            <div className="divide-y divide-emerald-100/70 dark:divide-slate-800 mt-2">
               {latestFiveTransactions.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400">
                   Belum ada transaksi tercatat.
                 </div>
               ) : (
                 latestFiveTransactions.map((tx) => (
-                  <div key={tx.id} className="py-2.5 flex items-center justify-between text-xs">
+                  <div key={`dash-${tx.id}`} className="py-2.5 flex items-center justify-between text-xs md:text-sm">
                     <div className="space-y-0.5">
-                      <div className="font-semibold text-slate-800 truncate max-w-[170px]">
+                      <div className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[170px]">
                         {tx.items[0]?.nama || 'Transaksi'} {tx.items.length > 1 && `+${tx.items.length - 1} item`}
                       </div>
-                      <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                      <div className="text-xs text-slate-400 flex items-center gap-2">
                         <span>{tx.nomorStruk}</span>
                         <span>·</span>
-                        <span className="font-medium text-emerald-700">{tx.metodePembayaran.toUpperCase()}</span>
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-400">{tx.metodePembayaran.toUpperCase()}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -450,7 +335,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
                         <div className="font-bold text-slate-900 dark:text-white">
                           {formatRupiah(tx.totalJual)}
                         </div>
-                        <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                        <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">
                           +{formatRupiah(tx.totalLaba)}
                         </div>
                       </div>
@@ -459,7 +344,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
                           type="button"
                           onClick={() => onOpenReceipt(tx)}
                           title="Cetak Struk Transaksi"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-100/60 transition-colors"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-100/60 dark:hover:bg-slate-800 transition-colors"
                         >
                           <Printer className="w-3.5 h-3.5" />
                         </button>
@@ -471,10 +356,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
             </div>
           </div>
 
-          <div className="pt-3 border-t border-emerald-100 mt-2">
+          <div className="pt-3 border-t border-emerald-100 dark:border-slate-800 mt-2">
             <button
               onClick={() => setActiveTab('transaksi')}
-              className="w-full py-2 px-3 rounded-xl bg-emerald-100/70 hover:bg-emerald-200/70 text-xs font-bold text-emerald-800 flex items-center justify-center gap-1.5 transition-colors"
+              className="w-full py-2.5 px-3 rounded-xl bg-emerald-100/70 hover:bg-emerald-200/70 dark:bg-emerald-950/40 text-xs md:text-sm font-bold text-emerald-800 dark:text-emerald-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <span>Lihat Selengkapnya</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -483,40 +368,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
         </div>
 
         {/* BLOK 2: Stok Menipis (Soft Amber) */}
-        <div className="bg-gradient-to-b from-amber-50/60 to-white border border-amber-200/70 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+        <div className="bg-gradient-to-b from-amber-50/60 to-white dark:from-slate-900 dark:to-slate-900/90 border border-amber-200/70 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-amber-100">
+            <div className="flex items-center justify-between pb-3 border-b border-amber-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
                   <AlertTriangle className="w-3.5 h-3.5" />
                 </div>
-                <h3 className="font-bold text-sm text-amber-950">
+                <h3 className="font-bold text-sm text-amber-950 dark:text-white">
                   Barang Stok Menipis
                 </h3>
               </div>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
                 {lowStockItems.length} Menipis
               </span>
             </div>
 
-            <div className="divide-y divide-amber-100/70 mt-2">
+            <div className="divide-y divide-amber-100/70 dark:divide-slate-800 mt-2">
               {lowStockItems.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400">
                   Semua stok barang aman di atas batas minimum.
                 </div>
               ) : (
                 lowStockItems.slice(0, 5).map((item) => (
-                  <div key={item.id} className="py-2.5 flex items-center justify-between text-xs">
+                  <div key={item.id} className="py-2.5 flex items-center justify-between text-xs md:text-sm">
                     <div>
-                      <div className="font-semibold text-slate-800">
+                      <div className="font-semibold text-slate-800 dark:text-slate-200">
                         {item.nama}
                       </div>
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-xs text-slate-400">
                         Min. Stok: {item.stokMinimum} {item.satuan} · Jual: {formatRupiah(item.hargaJual)}
                       </div>
                     </div>
                     <div className="text-right font-mono">
-                      <span className="font-bold text-rose-700 bg-rose-100/70 border border-rose-200 px-2 py-0.5 rounded-lg text-xs">
+                      <span className="font-bold text-rose-700 dark:text-rose-400 bg-rose-100/70 dark:bg-rose-950/60 border border-rose-200 px-2 py-0.5 rounded-lg text-xs">
                         Sisa: {item.stok} {item.satuan}
                       </span>
                     </div>
@@ -526,10 +411,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
             </div>
           </div>
 
-          <div className="pt-3 border-t border-amber-100 mt-2">
+          <div className="pt-3 border-t border-amber-100 dark:border-slate-800 mt-2">
             <button
               onClick={() => setActiveTab('master')}
-              className="w-full py-2 px-3 rounded-xl bg-amber-100/70 hover:bg-amber-200/70 text-xs font-bold text-amber-800 flex items-center justify-center gap-1.5 transition-colors"
+              className="w-full py-2.5 px-3 rounded-xl bg-amber-100/70 hover:bg-amber-200/70 dark:bg-amber-950/40 text-xs md:text-sm font-bold text-amber-800 dark:text-amber-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <span>Lihat Selengkapnya</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -538,43 +423,43 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
         </div>
 
         {/* BLOK 3: Hutang Pelanggan (Soft Rose) */}
-        <div className="bg-gradient-to-b from-rose-50/60 to-white border border-rose-200/70 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+        <div className="bg-gradient-to-b from-rose-50/60 to-white dark:from-slate-900 dark:to-slate-900/90 border border-rose-200/70 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-rose-100">
+            <div className="flex items-center justify-between pb-3 border-b border-rose-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
                   <CreditCard className="w-3.5 h-3.5" />
                 </div>
-                <h3 className="font-bold text-sm text-rose-950">
+                <h3 className="font-bold text-sm text-rose-950 dark:text-white">
                   Hutang Pelanggan
                 </h3>
               </div>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
                 {activeDebts.length} Kasbon
               </span>
             </div>
 
-            <div className="divide-y divide-rose-100/70 mt-2">
+            <div className="divide-y divide-rose-100/70 dark:divide-slate-800 mt-2">
               {activeDebts.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400">
                   Tidak ada hutang pelanggan yang belum lunas.
                 </div>
               ) : (
                 activeDebts.map((debt) => (
-                  <div key={debt.id} className="py-2.5 flex items-center justify-between text-xs">
+                  <div key={debt.id} className="py-2.5 flex items-center justify-between text-xs md:text-sm">
                     <div>
-                      <div className="font-semibold text-slate-800">
+                      <div className="font-semibold text-slate-800 dark:text-slate-200">
                         {debt.namaPelanggan}
                       </div>
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-xs text-slate-400">
                         Tempo: {debt.jatuhTempo || '-'} · {debt.noHpPelanggan || 'Tanpa No HP'}
                       </div>
                     </div>
                     <div className="text-right font-mono">
-                      <div className="font-bold text-rose-700">
+                      <div className="font-bold text-rose-700 dark:text-rose-400">
                         {formatRupiah(debt.sisaHutang)}
                       </div>
-                      <div className="text-[10px] text-slate-400">
+                      <div className="text-xs text-slate-400">
                         Dari {formatRupiah(debt.totalHutang)}
                       </div>
                     </div>

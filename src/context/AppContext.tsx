@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   Transaction,
   TransactionItem,
@@ -10,6 +10,7 @@ import {
   MasterBBM,
   MasterPSUnit,
   PSRentalSession,
+  PSSisaWaktuRecord,
   UserAccount,
   StoreSettings
 } from '../types';
@@ -35,6 +36,9 @@ interface AppContextType {
   logout: () => void;
   addUser: (user: Omit<UserAccount, 'id' | 'createdAt'>) => void;
   deleteUser: (id: string) => void;
+  updateUserProfile: (name: string, username: string, password?: string) => void;
+  toggleUserActive: (id: string) => void;
+  resetUserPassword: (id: string, newPass: string) => void;
 
   // Active view
   activeTab: string;
@@ -74,7 +78,7 @@ interface AppContextType {
 
   bbmList: MasterBBM[];
   setBbmList: React.Dispatch<React.SetStateAction<MasterBBM[]>>;
-  updateBbmPriceAndStock: (id: string, hargaPerLiter: number, stokLiter: number) => void;
+  updateBbmPricesAndStock: (id: string, hargaBeli: number, hargaJual: number, stokLiter: number) => void;
 
   psUnits: MasterPSUnit[];
   setPsUnits: React.Dispatch<React.SetStateAction<MasterPSUnit[]>>;
@@ -84,10 +88,25 @@ interface AppContextType {
 
   // PlayStation Live Rental Sessions
   activePsSessions: PSRentalSession[];
-  startPsSession: (unitId: string, namaPelanggan: string, mode: 'open_billing' | 'paket_jam', durasiJam?: number) => void;
+  startPsSession: (
+    unitId: string,
+    namaPelanggan: string,
+    mode: 'open_billing' | 'paket_jam',
+    durasiJam?: number,
+    metodeBayar?: string,
+    statusBayar?: 'lunas' | 'belum_bayar'
+  ) => void;
   addItemToPsSession: (sessionId: string, barangId: string, qty: number) => void;
-  finishPsSession: (sessionId: string, metodeBayar: any) => Transaction | null;
+  finishPsSession: (sessionId: string, metodeBayar?: any) => Transaction | null;
   cancelPsSession: (sessionId: string) => void;
+  markPsSessionPaid: (sessionId: string, metodeBayar?: string) => void;
+  extendPsSession: (sessionId: string, hoursToAdd: number) => void;
+
+  // PlayStation Sisa Waktu (Deposit Waktu)
+  psSisaWaktuList: PSSisaWaktuRecord[];
+  savePsSisaWaktu: (sessionId: string, namaPelanggan: string, sisaMenit: number, catatan?: string) => Transaction | null;
+  usePsSisaWaktu: (sisaWaktuId: string, unitId: string) => void;
+  deletePsSisaWaktu: (sisaWaktuId: string) => void;
 
   // Store Settings & Google Sheets Sync
   settings: StoreSettings;
@@ -122,6 +141,7 @@ const STORAGE_KEYS = {
   BBM: 'pos_bbm_v2',
   PS_UNITS: 'pos_ps_units_v2',
   PS_SESSIONS: 'pos_ps_sessions_v2',
+  PS_SISA_WAKTU: 'pos_ps_sisa_waktu_v2',
   SETTINGS: 'pos_settings_v2',
   DARK_MODE: 'pos_dark_mode_v2'
 };
@@ -278,76 +298,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [bbmList, setBbmList] = useState<MasterBBM[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.BBM);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      try {
+        const parsed: MasterBBM[] = JSON.parse(saved);
+        return parsed.map((b) => ({
+          ...b,
+          hargaBeli: b.hargaBeli ?? 10000,
+          hargaJual: b.hargaJual ?? b.hargaPerLiter ?? 12000,
+          hargaPerLiter: b.hargaJual ?? b.hargaPerLiter ?? 12000
+        }));
+      } catch (e) {}
+    }
     return [
-      { id: 'bbm_1', jenisBBM: 'Pertalite', hargaPerLiter: 10000, stokLiter: 185.5 },
-      { id: 'bbm_2', jenisBBM: 'Pertamax 92', hargaPerLiter: 12500, stokLiter: 120.0 },
-      { id: 'bbm_3', jenisBBM: 'Biosolar', hargaPerLiter: 6800, stokLiter: 65.0 }
+      { id: 'bbm_1', jenisBBM: 'Pertalite', hargaBeli: 10000, hargaJual: 12000, hargaPerLiter: 12000, stokLiter: 185.5 },
+      { id: 'bbm_2', jenisBBM: 'Pertamax 92', hargaBeli: 11500, hargaJual: 13500, hargaPerLiter: 13500, stokLiter: 120.0 },
+      { id: 'bbm_3', jenisBBM: 'Biosolar', hargaBeli: 6000, hargaJual: 7500, hargaPerLiter: 7500, stokLiter: 65.0 }
     ];
   });
 
   const [psUnits, setPsUnits] = useState<MasterPSUnit[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.PS_UNITS);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      try {
+        const parsed: MasterPSUnit[] = JSON.parse(saved);
+        // Ensure all units are configured with 6000/jam (Rp 3.000 / 30 menit)
+        return parsed.map((u) => ({
+          ...u,
+          tarifPerJam: u.tarifPerJam && u.tarifPerJam >= 6000 ? u.tarifPerJam : 6000
+        }));
+      } catch (e) {}
+    }
     return [
-      { id: 'ps_1', kodeUnit: 'PS-01', namaUnit: 'PS5 TV 55" VIP 1', tarifPerJam: 15000, status: 'sedang_main', tipeKonsol: 'PS5' },
-      { id: 'ps_2', kodeUnit: 'PS-02', namaUnit: 'PS5 TV 55" VIP 2', tarifPerJam: 15000, status: 'tersedia', tipeKonsol: 'PS5' },
-      { id: 'ps_3', kodeUnit: 'PS-03', namaUnit: 'PS4 TV 43" Stasiun 3', tarifPerJam: 10000, status: 'tersedia', tipeKonsol: 'PS4' },
-      { id: 'ps_4', kodeUnit: 'PS-04', namaUnit: 'PS4 TV 43" Stasiun 4', tarifPerJam: 10000, status: 'sedang_main', tipeKonsol: 'PS4' },
+      { id: 'ps_1', kodeUnit: 'PS-01', namaUnit: 'PS5 TV 55" VIP 1', tarifPerJam: 6000, status: 'tersedia', tipeKonsol: 'PS5' },
+      { id: 'ps_2', kodeUnit: 'PS-02', namaUnit: 'PS5 TV 55" VIP 2', tarifPerJam: 6000, status: 'tersedia', tipeKonsol: 'PS5' },
+      { id: 'ps_3', kodeUnit: 'PS-03', namaUnit: 'PS4 TV 43" Stasiun 3', tarifPerJam: 6000, status: 'tersedia', tipeKonsol: 'PS4' },
+      { id: 'ps_4', kodeUnit: 'PS-04', namaUnit: 'PS4 TV 43" Stasiun 4', tarifPerJam: 6000, status: 'tersedia', tipeKonsol: 'PS4' },
       { id: 'ps_5', kodeUnit: 'PS-05', namaUnit: 'PS3 Regular Stasiun 5', tarifPerJam: 6000, status: 'tersedia', tipeKonsol: 'PS3' }
     ];
   });
 
   const [activePsSessions, setActivePsSessions] = useState<PSRentalSession[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.PS_SESSIONS);
-    if (saved) return JSON.parse(saved);
-    const oneHourAgo = new Date(Date.now() - 45 * 60 * 1000).toISOString();
-    const twentyMinsAgo = new Date(Date.now() - 20 * 60 * 1000).toISOString();
-    return [
-      {
-        id: 'sess_1',
-        unitId: 'ps_1',
-        namaUnit: 'PS5 TV 55" VIP 1',
-        namaPelanggan: 'Rian & Teman',
-        mode: 'open_billing',
-        tarifPerJam: 15000,
-        waktuMulai: oneHourAgo,
-        durasiMenitTerhitung: 45,
-        biayaRental: 11250,
-        tambahanItem: [
-          {
-            nama: 'Kopi Good Day Freeze',
-            kategori: 'barang',
-            qty: 2,
-            satuan: 'cup',
-            hargaModal: 2500,
-            hargaJual: 5000,
-            subtotal: 10000,
-            laba: 5000
-          }
-        ],
-        totalBiaya: 21250,
-        status: 'aktif',
-        kasirName: 'Pemilik Toko (Owner)'
-      },
-      {
-        id: 'sess_2',
-        unitId: 'ps_4',
-        namaUnit: 'PS4 TV 43" Stasiun 4',
-        namaPelanggan: 'Aldi',
-        mode: 'paket_jam',
-        durasiPaketJam: 2,
-        waktuMulai: twentyMinsAgo,
-        waktuSelesaiRencana: new Date(Date.now() + 100 * 60 * 1000).toISOString(),
-        tarifPerJam: 10000,
-        durasiMenitTerhitung: 20,
-        biayaRental: 20000,
-        tambahanItem: [],
-        totalBiaya: 20000,
-        status: 'aktif',
-        kasirName: 'Kasir Toko (Shift Pagi)'
-      }
-    ];
+    if (saved) {
+      try {
+        const parsed: PSRentalSession[] = JSON.parse(saved);
+        return parsed.map((s) => ({
+          ...s,
+          tarifPerJam: s.tarifPerJam && s.tarifPerJam >= 6000 ? s.tarifPerJam : 6000,
+          statusBayar: s.statusBayar || 'lunas'
+        }));
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  // PlayStation Sisa Waktu (Deposit Remaining Time) State
+  const [psSisaWaktuList, setPsSisaWaktuList] = useState<PSSisaWaktuRecord[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.PS_SISA_WAKTU);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [];
   });
 
   // Transactions State
@@ -625,6 +638,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.BBM, JSON.stringify(bbmList)); }, [bbmList]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.PS_UNITS, JSON.stringify(psUnits)); }, [psUnits]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.PS_SESSIONS, JSON.stringify(activePsSessions)); }, [activePsSessions]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.PS_SISA_WAKTU, JSON.stringify(psSisaWaktuList)); }, [psSisaWaktuList]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings)); }, [settings]);
 
   // Firebase auth initialization listener
@@ -641,27 +655,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   }, []);
 
+  const finishPsSessionRef = useRef<any>(null);
+
   // Timer interval for PlayStation active billing sessions
   useEffect(() => {
     const interval = setInterval(() => {
+      const now = Date.now();
       setActivePsSessions((prevSessions) => {
         let changed = false;
-        const now = Date.now();
         const updated = prevSessions.map((sess) => {
           if (sess.status !== 'aktif') return sess;
+
+          // Auto finish if paket_jam time is reached (berhenti otomatis saat waktu habis)
+          if (sess.mode === 'paket_jam' && sess.waktuSelesaiRencana) {
+            const planEndMs = new Date(sess.waktuSelesaiRencana).getTime();
+            if (now >= planEndMs) {
+              if (finishPsSessionRef.current) {
+                setTimeout(() => finishPsSessionRef.current(sess.id, sess.metodeBayar || 'tunai'), 0);
+              }
+            }
+          }
+
           const startTimeMs = new Date(sess.waktuMulai).getTime();
           const elapsedMinutes = Math.max(1, Math.ceil((now - startTimeMs) / (60 * 1000)));
 
           let computedRentalCost = 0;
+          const tarifPer30Mnt = Math.round((sess.tarifPerJam && sess.tarifPerJam >= 6000 ? sess.tarifPerJam : 6000) / 2); // Rp 3.000 per 30 menit
           if (sess.mode === 'paket_jam' && sess.durasiPaketJam) {
-            computedRentalCost = sess.tarifPerJam * sess.durasiPaketJam;
+            computedRentalCost = Math.round((sess.durasiPaketJam / 0.5) * tarifPer30Mnt);
           } else {
-            // Open billing: calculate prorated per 10 minutes or actual hours
-            const hoursDecimal = elapsedMinutes / 60;
-            computedRentalCost = Math.ceil((hoursDecimal * sess.tarifPerJam) / 500) * 500;
-            if (computedRentalCost < sess.tarifPerJam / 2) {
-              computedRentalCost = Math.round(sess.tarifPerJam / 2); // Minimum 30 mins
-            }
+            // Open billing: calculate strictly per minute at 83.33 / 83.34 rupiah per minute (5000 / 60)
+            const ratePerMin = 5000 / 60; // ~83.3333 rupiah per minute
+            computedRentalCost = Math.round(elapsedMinutes * ratePerMin);
           }
 
           const fnbTotal = sess.tambahanItem.reduce((acc, it) => acc + it.subtotal, 0);
@@ -680,7 +705,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
         return changed ? updated : prevSessions;
       });
-    }, 10000); // update every 10 seconds
+    }, 5000); // check every 5 seconds
 
     return () => clearInterval(interval);
   }, []);
@@ -693,6 +718,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (u.password === pass || !u.password)
     );
     if (match) {
+      if (match.isActive === false) {
+        return false; // account deactivated
+      }
       setCurrentUser(match);
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(match));
       return true;
@@ -730,6 +758,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       }
 
+      if (registeredUser.isActive === false) {
+        logoutGoogle();
+        setGoogleUser(null);
+        setGoogleAccessToken(null);
+        setCurrentUser(null);
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+        return {
+          success: false,
+          message: `Akun Google "${email}" telah dinonaktifkan oleh Owner.`
+        };
+      }
+
       // Found registered user!
       setCurrentUser(registeredUser);
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(registeredUser));
@@ -752,6 +792,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newUser: UserAccount = {
       ...userData,
       id: `usr_${Date.now()}`,
+      isActive: true,
       createdAt: new Date().toISOString()
     };
     setUsers((prev) => [...prev, newUser]);
@@ -759,6 +800,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteUser = (id: string) => {
     setUsers((prev) => prev.filter((u) => u.id !== id));
+  };
+
+  const updateUserProfile = (name: string, username: string, password?: string) => {
+    if (!currentUser) return;
+    setUsers((prev) =>
+      prev.map((u) => {
+        if (u.id === currentUser.id) {
+          const updated = {
+            ...u,
+            name: name.trim() || u.name,
+            username: username.trim() || u.username,
+            password: password && password.trim() ? password.trim() : u.password
+          };
+          setCurrentUser(updated);
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
+          return updated;
+        }
+        return u;
+      })
+    );
+  };
+
+  const toggleUserActive = (id: string) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, isActive: u.isActive === false ? true : false } : u))
+    );
+  };
+
+  const resetUserPassword = (id: string, newPass: string) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, password: newPass } : u))
+    );
   };
 
   // Transaction Functions
@@ -804,8 +877,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
-    // If payment status is Hutang, automatically create a Debt record
-    if (newTx.statusPembayaran === 'hutang') {
+    // If payment status is Hutang or Sebagian, automatically create a Debt record
+    if (newTx.statusPembayaran === 'hutang' || newTx.statusPembayaran === 'sebagian') {
+      const isSebagian = newTx.statusPembayaran === 'sebagian';
+      const paidAmount = isSebagian ? (newTx.jumlahBayar || 0) : 0;
+      const sisaAmount = isSebagian
+        ? (newTx.sisaHutang !== undefined ? newTx.sisaHutang : Math.max(0, newTx.totalJual - paidAmount))
+        : newTx.totalJual;
+
+      const initialPayments = isSebagian && paidAmount > 0
+        ? [
+            {
+              id: `pay_dp_${Date.now()}`,
+              waktu: newTx.waktu,
+              nominal: paidAmount,
+              metode: newTx.metodePembayaran,
+              kasirName: newTx.kasirName,
+              catatan: 'Pembayaran sebagian (DP saat transaksi)'
+            }
+          ]
+        : [];
+
       const newDebt: DebtRecord = {
         id: `debt_${Date.now()}`,
         transaksiId: newTx.id,
@@ -815,11 +907,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         tanggalTransaksi: newTx.tanggal,
         jatuhTempo: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0], // 7 days default
         totalHutang: newTx.totalJual,
-        totalDibayar: 0,
-        sisaHutang: newTx.totalJual,
-        status: 'belum_lunas',
-        riwayatPembayaran: [],
-        catatan: newTx.catatan || 'Hutang Transaksi Baru'
+        totalDibayar: paidAmount,
+        sisaHutang: sisaAmount,
+        status: isSebagian ? 'sebagian' : 'belum_lunas',
+        riwayatPembayaran: initialPayments,
+        catatan: newTx.catatan || (isSebagian ? 'Bayar Sebagian Transaksi Baru' : 'Hutang Transaksi Baru')
       };
       setDebts((prev) => [newDebt, ...prev]);
     }
@@ -911,9 +1003,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBarangList((prev) => prev.filter((b) => b.id !== id));
   };
 
-  const updateBbmPriceAndStock = (id: string, hargaPerLiter: number, stokLiter: number) => {
+  const updateBbmPricesAndStock = (id: string, hargaBeli: number, hargaJual: number, stokLiter: number) => {
     setBbmList((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, hargaPerLiter, stokLiter } : b))
+      prev.map((b) => (b.id === id ? { ...b, hargaBeli, hargaJual, hargaPerLiter: hargaJual, stokLiter } : b))
     );
   };
 
@@ -933,38 +1025,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     unitId: string,
     namaPelanggan: string,
     mode: 'open_billing' | 'paket_jam',
-    durasiJam?: number
+    durasiJam?: number,
+    metodeBayar: string = 'tunai',
+    statusBayar: 'lunas' | 'belum_bayar' = 'lunas'
   ) => {
     const unit = psUnits.find((u) => u.id === unitId);
     if (!unit) return;
 
     const now = new Date();
     let plannedEnd: string | undefined = undefined;
-    let initialCost = 0;
+    const unitTarif = unit.tarifPerJam && unit.tarifPerJam >= 6000 ? unit.tarifPerJam : 6000;
+    const tarifPer30Mnt = Math.round(unitTarif / 2); // Standar Rp 3.000 per 30 menit
 
+    let initialCost = 0;
     if (mode === 'paket_jam' && durasiJam) {
       plannedEnd = new Date(now.getTime() + durasiJam * 60 * 60 * 1000).toISOString();
-      initialCost = unit.tarifPerJam * durasiJam;
+      initialCost = Math.round((durasiJam / 0.5) * tarifPer30Mnt);
     } else {
-      initialCost = Math.round(unit.tarifPerJam / 2); // Initial min 30 mins
+      initialCost = 0; // Open billing starts at 0, no upfront fee
     }
 
     const newSession: PSRentalSession = {
       id: `sess_${Date.now()}`,
       unitId,
       namaUnit: unit.namaUnit,
-      namaPelanggan: namaPelanggan || 'Pelanggan PS',
+      namaPelanggan: namaPelanggan.trim() || 'Pelanggan PS',
       mode,
       durasiPaketJam: durasiJam,
       waktuMulai: now.toISOString(),
       waktuSelesaiRencana: plannedEnd,
-      tarifPerJam: unit.tarifPerJam,
-      durasiMenitTerhitung: mode === 'paket_jam' && durasiJam ? durasiJam * 60 : 1,
+      tarifPerJam: unitTarif,
+      durasiMenitTerhitung: mode === 'paket_jam' && durasiJam ? Math.round(durasiJam * 60) : 1,
       biayaRental: initialCost,
       tambahanItem: [],
       totalBiaya: initialCost,
       status: 'aktif',
-      kasirName: currentUser?.name || 'Kasir'
+      kasirName: currentUser?.name || 'Kasir',
+      metodeBayar: metodeBayar || 'tunai',
+      statusBayar
     };
 
     setActivePsSessions((prev) => [newSession, ...prev]);
@@ -972,6 +1070,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Set unit status to sedang_main
     setPsUnits((prev) =>
       prev.map((u) => (u.id === unitId ? { ...u, status: 'sedang_main' } : u))
+    );
+  };
+
+  const markPsSessionPaid = (sessionId: string, metodeBayar: string = 'tunai') => {
+    setActivePsSessions((prev) =>
+      prev.map((s) => (s.id === sessionId ? { ...s, statusBayar: 'lunas', metodeBayar } : s))
     );
   };
 
@@ -1014,12 +1118,105 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const finishPsSession = (sessionId: string, metodeBayar: any): Transaction | null => {
+  const finishPsSession = (
+    sessionId: string,
+    paymentOptions?: {
+      metodeBayar?: any;
+      statusPembayaran?: any;
+      jumlahBayar?: number;
+      sisaHutang?: number;
+    } | string
+  ): Transaction | null => {
+    finishPsSessionRef.current = finishPsSession;
     const session = activePsSessions.find((s) => s.id === sessionId);
     if (!session) return null;
 
+    let finalRentalCost = session.biayaRental;
+    let finalDurasiLabel = `${session.durasiMenitTerhitung} Menit`;
+
+    if (session.mode === 'open_billing') {
+      const nowMs = Date.now();
+      const startMs = new Date(session.waktuMulai).getTime();
+      const diffSecs = Math.max(0, Math.floor((nowMs - startMs) / 1000));
+      const elapsedMins = Math.max(1, Math.ceil(diffSecs / 60));
+      finalDurasiLabel = `${elapsedMins} Menit (Open Billing)`;
+
+      // Tarif: ~83.33 / 83.34 rupiah per minute (5000 / 60)
+      const ratePerMin = 5000 / 60;
+      let cost = Math.round(elapsedMins * ratePerMin);
+      finalRentalCost = cost;
+    } else {
+      finalDurasiLabel = `${session.durasiPaketJam} Jam`;
+    }
+
     const rentalItem: TransactionItem = {
-      nama: `Rental ${session.namaUnit} (${session.mode === 'paket_jam' ? `${session.durasiPaketJam} Jam` : `${session.durasiMenitTerhitung} Menit`})`,
+      nama: `Rental ${session.namaUnit} (${finalDurasiLabel})`,
+      kategori: 'rental_ps',
+      qty: 1,
+      satuan: 'sesi',
+      hargaModal: 0,
+      hargaJual: finalRentalCost,
+      subtotal: finalRentalCost,
+      laba: finalRentalCost,
+      catatan: `Pelanggan: ${session.namaPelanggan}${session.statusBayar === 'lunas' ? ' (Bayar Diawal)' : ' (Bayar Diakhir)'}`
+    };
+
+    const allItems: TransactionItem[] = [rentalItem, ...session.tambahanItem];
+    const totalModal = allItems.reduce((acc, it) => acc + (it.hargaModal * (it.qty || 1)), 0);
+    const fnbTotal = session.tambahanItem.reduce((acc, it) => acc + it.subtotal, 0);
+    const totalJual = finalRentalCost + fnbTotal;
+    const totalLaba = totalJual - totalModal;
+
+    const method = typeof paymentOptions === 'string'
+      ? paymentOptions
+      : (paymentOptions?.metodeBayar || session.metodeBayar || 'tunai');
+    const status = typeof paymentOptions === 'object' && paymentOptions?.statusPembayaran
+      ? paymentOptions.statusPembayaran
+      : 'lunas';
+    const jumlahBayar = typeof paymentOptions === 'object' ? paymentOptions?.jumlahBayar : undefined;
+    const sisaHutang = typeof paymentOptions === 'object' ? paymentOptions?.sisaHutang : undefined;
+
+    const createdTx = addTransaction({
+      kategoriUtama: 'rental_ps',
+      items: allItems,
+      totalModal,
+      totalJual,
+      totalLaba,
+      metodePembayaran: method as any,
+      statusPembayaran: status as any,
+      jumlahBayar,
+      sisaHutang,
+      namaPelanggan: session.namaPelanggan,
+      kasirName: currentUser?.name || session.kasirName,
+      kasirId: currentUser?.id || 'usr_unknown',
+      catatan: `Selesai Rental ${session.namaUnit} (${finalDurasiLabel})`
+    });
+
+    // Remove from active sessions
+    setActivePsSessions((prev) => prev.filter((s) => s.id !== sessionId));
+
+    // Release unit
+    setPsUnits((prev) =>
+      prev.map((u) => (u.id === session.unitId ? { ...u, status: 'tersedia' } : u))
+    );
+
+    return createdTx;
+  };
+
+  const savePsSisaWaktu = (
+    sessionId: string,
+    namaPelangganInput: string,
+    sisaMenit: number,
+    catatan?: string
+  ): Transaction | null => {
+    const session = activePsSessions.find((s) => s.id === sessionId);
+    if (!session) return null;
+
+    const finalName = namaPelangganInput.trim() || session.namaPelanggan || 'Pelanggan PS';
+
+    // Record session transaction ("tetap masuk transaksinya")
+    const rentalItem: TransactionItem = {
+      nama: `Rental ${session.namaUnit} (Sisa ${sisaMenit} mnt dicatat untuk ${finalName})`,
       kategori: 'rental_ps',
       qty: 1,
       satuan: 'sesi',
@@ -1027,7 +1224,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       hargaJual: session.biayaRental,
       subtotal: session.biayaRental,
       laba: session.biayaRental,
-      catatan: `Pelanggan: ${session.namaPelanggan}`
+      catatan: `Sisa waktu ${sisaMenit} menit dicatat untuk ${finalName}`
     };
 
     const allItems: TransactionItem[] = [rentalItem, ...session.tambahanItem];
@@ -1041,23 +1238,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       totalModal,
       totalJual,
       totalLaba,
-      metodePembayaran: metodeBayar || 'tunai',
+      metodePembayaran: (session.metodeBayar || 'tunai') as any,
       statusPembayaran: 'lunas',
-      namaPelanggan: session.namaPelanggan,
+      namaPelanggan: finalName,
       kasirName: currentUser?.name || session.kasirName,
       kasirId: currentUser?.id || 'usr_unknown',
-      catatan: `Selesai Rental ${session.namaUnit}`
+      catatan: `Sisa waktu (${sisaMenit} mnt) disimpan untuk ${finalName} - Unit ${session.namaUnit}`
     });
 
-    // Remove from active sessions
-    setActivePsSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    // Add to deposit sisa waktu list
+    const newRecord: PSSisaWaktuRecord = {
+      id: `sw_${Date.now()}`,
+      namaPelanggan: finalName,
+      namaUnit: session.namaUnit,
+      sisaMenit: Math.max(1, sisaMenit),
+      waktuSimpan: new Date().toISOString(),
+      sudahDigunakan: false,
+      catatan: catatan || `Sisa waktu dari sesi ${session.namaUnit}`,
+      kasirName: currentUser?.name || 'Kasir'
+    };
 
-    // Release unit
+    setPsSisaWaktuList((prev) => [newRecord, ...prev]);
+
+    // Release active session & unit
+    setActivePsSessions((prev) => prev.filter((s) => s.id !== sessionId));
     setPsUnits((prev) =>
       prev.map((u) => (u.id === session.unitId ? { ...u, status: 'tersedia' } : u))
     );
 
     return createdTx;
+  };
+
+  const usePsSisaWaktu = (sisaWaktuId: string, unitId: string) => {
+    const record = psSisaWaktuList.find((r) => r.id === sisaWaktuId);
+    if (!record) return;
+
+    const durasiJam = record.sisaMenit / 60;
+    startPsSession(unitId, record.namaPelanggan, 'paket_jam', durasiJam, 'tunai', 'lunas');
+
+    // Mark as used
+    setPsSisaWaktuList((prev) =>
+      prev.map((r) => (r.id === sisaWaktuId ? { ...r, sudahDigunakan: true } : r))
+    );
+  };
+
+  const deletePsSisaWaktu = (sisaWaktuId: string) => {
+    setPsSisaWaktuList((prev) => prev.filter((r) => r.id !== sisaWaktuId));
+  };
+
+  const extendPsSession = (sessionId: string, hoursToAdd: number) => {
+    setActivePsSessions((prev) =>
+      prev.map((s) => {
+        if (s.id !== sessionId) return s;
+        const currentEndMs = s.waktuSelesaiRencana ? new Date(s.waktuSelesaiRencana).getTime() : Date.now();
+        const newEndMs = Math.max(Date.now(), currentEndMs) + hoursToAdd * 60 * 60 * 1000;
+        const newDurasiJam = (s.durasiPaketJam || 0) + hoursToAdd;
+
+        const tarifPer30Mnt = Math.round((s.tarifPerJam && s.tarifPerJam >= 6000 ? s.tarifPerJam : 6000) / 2);
+        const newBiayaRental = Math.round((newDurasiJam / 0.5) * tarifPer30Mnt);
+        const fnbTotal = s.tambahanItem.reduce((acc, it) => acc + it.subtotal, 0);
+
+        return {
+          ...s,
+          durasiPaketJam: newDurasiJam,
+          waktuSelesaiRencana: new Date(newEndMs).toISOString(),
+          biayaRental: newBiayaRental,
+          totalBiaya: newBiayaRental + fnbTotal
+        };
+      })
+    );
   };
 
   const cancelPsSession = (sessionId: string) => {
@@ -1216,6 +1465,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logout,
         addUser,
         deleteUser,
+        updateUserProfile,
+        toggleUserActive,
+        resetUserPassword,
 
         activeTab,
         setActiveTab,
@@ -1250,7 +1502,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         bbmList,
         setBbmList,
-        updateBbmPriceAndStock,
+        updateBbmPricesAndStock,
 
         psUnits,
         setPsUnits,
@@ -1263,6 +1515,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addItemToPsSession,
         finishPsSession,
         cancelPsSession,
+        markPsSessionPaid,
+        extendPsSession,
+
+        psSisaWaktuList,
+        savePsSisaWaktu,
+        usePsSisaWaktu,
+        deletePsSisaWaktu,
 
         settings,
         updateSettings,
