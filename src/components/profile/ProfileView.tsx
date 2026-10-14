@@ -10,7 +10,11 @@ import {
   Shield,
   UserCheck,
   Check,
-  KeyRound
+  KeyRound,
+  DownloadCloud,
+  Link2,
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react';
 import { UserAccount } from '../../types';
 
@@ -29,6 +33,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenAuthModal }) => 
     settings,
     updateSettings,
     googleUser,
+    loginGoogle,
+    disconnectGoogle,
+    pullDataFromGoogleSheet,
     isSyncing,
     syncStatusMessage,
     triggerGoogleSheetSync,
@@ -46,7 +53,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenAuthModal }) => 
   const [isSavedStore, setIsSavedStore] = useState(false);
   const [linkSpreadsheetInput, setLinkSpreadsheetInput] = useState('');
 
-  const handleLinkExistingSpreadsheet = () => {
+  const handleLinkExistingSpreadsheet = async (mode: 'pull' | 'push' = 'push') => {
     const trimmed = linkSpreadsheetInput.trim();
     if (!trimmed) {
       alert('Masukkan ID atau URL Google Spreadsheet yang valid.');
@@ -62,7 +69,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenAuthModal }) => 
       autoSyncSheets: true
     });
     setLinkSpreadsheetInput('');
-    alert('Spreadsheet berhasil ditautkan! Silakan klik "Sinkronkan Data Sekarang" untuk menyinkronkan data.');
+
+    if (mode === 'pull') {
+      const res = await pullDataFromGoogleSheet();
+      alert(res.message);
+    } else {
+      const ok = await triggerGoogleSheetSync(false, true);
+      if (ok) {
+        alert('Spreadsheet berhasil ditautkan dan data kasir berhasil disinkronkan!');
+      }
+    }
   };
 
   // Profile Edit Form (Kasir or Owner identity/password edit)
@@ -233,72 +249,169 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenAuthModal }) => 
             </form>
           </div>
 
-          {/* Google Sheets Sync Card (Owner always, or Non-owner if not yet connected) */}
-          {(isOwner || !settings.spreadsheetUrl) && (
-            <div className="bg-gradient-to-br from-sky-50/80 via-sky-50/40 to-white border border-sky-200/90 rounded-2xl p-5 shadow-xs space-y-4">
+          {/* Google Sheets Sync Card */}
+          <div className="bg-gradient-to-br from-sky-50/90 via-sky-50/40 to-white dark:from-slate-900 dark:via-slate-900/90 dark:to-slate-950 border border-sky-200/90 dark:border-sky-950 rounded-2xl p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-sm text-sky-950 flex items-center gap-2">
+              <h3 className="font-bold text-sm text-sky-950 dark:text-sky-200 flex items-center gap-2">
                 <FileSpreadsheet className="w-4 h-4 text-sky-600" />
                 <span>Google Spreadsheet Sync</span>
               </h3>
               {googleUser ? (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                   Auto-Sync Aktif
                 </span>
               ) : (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                  Lokal Saja
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                  Belum Terhubung
                 </span>
               )}
             </div>
 
-            <p className="text-xs text-sky-900/80 leading-relaxed">
-              {googleUser
-                ? `Akun Google: ${googleUser.email}. Sinkronisasi berjalan otomatis setiap kali ada transaksi, pelunasan kasbon, dan pengeluaran baru.`
-                : 'Hubungkan Akun Google untuk sinkronisasi otomatis seluruh pembukuan ke Google Drive Anda.'}
-            </p>
-
-            {settings.spreadsheetUrl && (
-              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-1 text-xs">
-                <span className="text-[11px] text-slate-400">Spreadsheet Terhubung:</span>
-                <div className="font-mono text-slate-700 dark:text-slate-300 truncate">
-                  {settings.spreadsheetId || 'POS_Database'}
+            {/* Google Account Connection Status */}
+            {!googleUser ? (
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl space-y-2.5">
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-200">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Akun Google Belum Terhubung</span>
                 </div>
-                <a
-                  href={settings.spreadsheetUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-semibold hover:underline mt-1"
+                <p className="text-[11px] text-amber-800/90 dark:text-amber-300/80 leading-relaxed">
+                  Hubungkan akun Google sekali saja agar database transaksi, penjualan BBM, kasbon, dan rental PS otomatis tersimpan aman di Google Drive Anda.
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await loginGoogle();
+                    if (res.success) {
+                      alert('Berhasil terhubung ke Akun Google! Auto-sync Google Sheet sekarang aktif.');
+                    } else if (res.message) {
+                      alert(res.message);
+                    }
+                  }}
+                  className="w-full py-2 px-3 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-white border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
                 >
-                  <span>Buka di Google Sheets</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  <span>Hubungkan Akun Google</span>
+                </button>
+              </div>
+            ) : (
+              <div className="p-3 bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-xs font-bold text-emerald-950 dark:text-emerald-200">
+                      Terhubung: {googleUser.email}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={disconnectGoogle}
+                    className="text-[11px] text-rose-600 hover:text-rose-700 font-semibold underline cursor-pointer"
+                  >
+                    Putuskan
+                  </button>
+                </div>
+                <label className="flex items-center justify-between pt-1 cursor-pointer">
+                  <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                    Otomatis sinkron setiap ada perubahan data
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={settings.autoSyncSheets !== false}
+                    onChange={(e) => updateSettings({ autoSyncSheets: e.target.checked })}
+                    className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                  />
+                </label>
               </div>
             )}
 
+            {/* Spreadsheet Link Status */}
+            {settings.spreadsheetUrl && (
+              <div className="p-3 bg-white dark:bg-slate-800 border border-sky-100 dark:border-slate-700 rounded-xl space-y-1.5 text-xs">
+                <span className="text-[11px] font-semibold text-slate-400">Spreadsheet Google Terhubung:</span>
+                <div className="font-mono text-slate-800 dark:text-slate-200 truncate select-all">
+                  {settings.spreadsheetId || 'POS_Database'}
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-700">
+                  <a
+                    href={settings.spreadsheetUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 font-bold hover:underline"
+                  >
+                    <span>Buka Spreadsheet di Drive</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                  {settings.lastSyncedAt && (
+                    <span className="text-[10px] text-slate-400">
+                      Tersinkron: {new Date(settings.lastSyncedAt).toLocaleTimeString('id-ID')}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Sync Action Buttons */}
             <div className="space-y-2">
               <button
-                onClick={() => triggerGoogleSheetSync()}
+                type="button"
+                onClick={() => triggerGoogleSheetSync(false, true)}
                 disabled={isSyncing}
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2 shadow-xs transition-colors"
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Data Sekarang'}</span>
+                <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Data Sekarang (Kirim ke Sheet)'}</span>
               </button>
+
+              {settings.spreadsheetId && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const confirmPull = confirm(
+                      'Peringatan: Tarik data dari Google Spreadsheet akan menyinkronkan dan memuat ulang seluruh transaksi, kasbon, pengeluaran, dan produk dari spreadsheet ke aplikasi ini. Lanjutkan?'
+                    );
+                    if (!confirmPull) return;
+                    const res = await pullDataFromGoogleSheet();
+                    alert(res.message);
+                  }}
+                  disabled={isSyncing}
+                  className="w-full py-2 px-4 rounded-xl text-xs font-semibold bg-sky-100 hover:bg-sky-200 dark:bg-sky-950/60 dark:hover:bg-sky-900 text-sky-900 dark:text-sky-200 flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <DownloadCloud className="w-3.5 h-3.5" />
+                  <span>Tarik / Pulihkan Database dari Spreadsheet</span>
+                </button>
+              )}
 
               {isOwner && !settings.spreadsheetUrl && (
                 <button
+                  type="button"
                   onClick={() => createNewGoogleSheet()}
                   disabled={isSyncing}
-                  className="w-full py-2 px-4 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors"
+                  className="w-full py-2 px-4 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
                 >
-                  + Buat Spreadsheet Baru di Drive
+                  + Buat Spreadsheet Baru Otomatis di Drive
                 </button>
               )}
 
               {/* Link Existing Spreadsheet */}
-              <div className="pt-2 border-t border-sky-100 dark:border-sky-900/50 space-y-2">
+              <div className="pt-3 border-t border-sky-100 dark:border-sky-900/50 space-y-2">
                 <label className="block text-xs font-bold text-sky-950 dark:text-sky-200">
                   Tautkan Spreadsheet yang Sudah Ada (ID / URL):
                 </label>
@@ -310,24 +423,33 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenAuthModal }) => 
                     onChange={(e) => setLinkSpreadsheetInput(e.target.value)}
                     className="flex-1 px-3 py-2 text-xs rounded-xl border border-sky-200 dark:border-sky-900 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
                   />
+                </div>
+                <div className="flex gap-2 pt-1">
                   <button
-                    onClick={handleLinkExistingSpreadsheet}
-                    className="px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold shrink-0 cursor-pointer"
+                    type="button"
+                    onClick={() => handleLinkExistingSpreadsheet('push')}
+                    className="flex-1 py-1.5 px-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[11px] font-bold text-center cursor-pointer transition-colors"
                   >
-                    Hubungkan
+                    Tautkan & Kirim Data
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLinkExistingSpreadsheet('pull')}
+                    className="flex-1 py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold text-center cursor-pointer transition-colors"
+                  >
+                    Tautkan & Tarik Data Lama
                   </button>
                 </div>
-                <span className="text-[10px] text-slate-500 block">
-                  Gunakan saat memindahkan perangkat atau update aplikasi agar langsung terhubung ke spreadsheet lama.
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 block leading-tight">
+                  Gunakan saat memindahkan perangkat atau update aplikasi agar langsung terhubung ke spreadsheet Google Drive lama Anda.
                 </span>
               </div>
             </div>
 
-            <div className="text-[11px] text-slate-400 italic">
+            <div className="text-[11px] text-slate-400 dark:text-slate-500 italic">
               Status: {syncStatusMessage}
             </div>
           </div>
-          )}
         </div>
 
         {/* Kolom 2 & 3: Hanya untuk Owner (Pengaturan Toko & Kelola Karyawan) */}

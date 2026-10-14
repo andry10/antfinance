@@ -299,8 +299,8 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
                   </td>
                 </tr>
               ) : (
-                filteredTransactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                filteredTransactions.map((tx, idx) => (
+                  <tr key={`tx-${tx.id || 'tx'}-${idx}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                     {/* No Struk & Waktu */}
                     <td className="py-3.5 px-3 sm:px-4">
                       <div className="font-mono font-bold text-sm text-slate-900 dark:text-white">

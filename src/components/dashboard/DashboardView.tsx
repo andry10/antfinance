@@ -318,8 +318,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
                   Belum ada transaksi tercatat.
                 </div>
               ) : (
-                latestFiveTransactions.map((tx) => (
-                  <div key={`dash-${tx.id}`} className="py-2.5 flex items-center justify-between text-xs md:text-sm">
+                latestFiveTransactions.map((tx, idx) => (
+                  <div key={`dash-${tx.id || 'tx'}-${idx}`} className="py-2.5 flex items-center justify-between text-xs md:text-sm">
                     <div className="space-y-0.5">
                       <div className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[170px]">
                         {tx.items[0]?.nama || 'Transaksi'} {tx.items.length > 1 && `+${tx.items.length - 1} item`}

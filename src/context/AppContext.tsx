@@ -22,7 +22,8 @@ import {
 } from '../services/firebase';
 import {
   createStoreSpreadsheet,
-  syncAllToGoogleSheet
+  syncAllToGoogleSheet,
+  pullAllFromGoogleSheet
 } from '../services/googleSheets';
 
 interface AppContextType {
@@ -113,7 +114,9 @@ interface AppContextType {
   updateSettings: (newSettings: Partial<StoreSettings>) => void;
   isSyncing: boolean;
   syncStatusMessage: string;
-  triggerGoogleSheetSync: (silent?: boolean) => Promise<boolean>;
+  triggerGoogleSheetSync: (silent?: boolean, interactive?: boolean) => Promise<boolean>;
+  pullDataFromGoogleSheet: () => Promise<{ success: boolean; message: string }>;
+  disconnectGoogle: () => Promise<void>;
   createNewGoogleSheet: () => Promise<string | null>;
 
   // Quick helper: modal opener
@@ -153,6 +156,9 @@ const getTodayDateStr = () => {
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+const generateUniqueId = (prefix: string) =>
+  `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const todayStr = getTodayDateStr();
@@ -366,7 +372,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Transactions State
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const seenIds = new Set<string>();
+          return parsed.map((tx: Transaction, idx: number) => {
+            let id = tx.id;
+            if (!id || seenIds.has(id)) {
+              id = `${id || 'tx'}_dup_${idx}_${Math.random().toString(36).substring(2, 6)}`;
+            }
+            seenIds.add(id);
+            return { ...tx, id };
+          });
+        }
+      } catch (e) {
+        console.error('Failed to parse saved transactions:', e);
+      }
+    }
     // Initial realistic transactions for today
     return [
       {
@@ -522,7 +545,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Debts State
   const [debts, setDebts] = useState<DebtRecord[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.DEBTS);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const seen = new Set<string>();
+          return parsed.map((d: DebtRecord, idx: number) => {
+            let id = d.id;
+            if (!id || seen.has(id)) {
+              id = `${id || 'debt'}_dup_${idx}_${Math.random().toString(36).substring(2, 6)}`;
+            }
+            seen.add(id);
+            return { ...d, id };
+          });
+        }
+      } catch (e) {
+        console.error('Failed to parse saved debts:', e);
+      }
+    }
     return [
       {
         id: 'debt_1',
@@ -569,7 +609,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Expenses State
   const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.EXPENSES);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const seen = new Set<string>();
+          return parsed.map((e: ExpenseRecord, idx: number) => {
+            let id = e.id;
+            if (!id || seen.has(id)) {
+              id = `${id || 'exp'}_dup_${idx}_${Math.random().toString(36).substring(2, 6)}`;
+            }
+            seen.add(id);
+            return { ...e, id };
+          });
+        }
+      } catch (err) {
+        console.error('Failed to parse saved expenses:', err);
+      }
+    }
     return [
       {
         id: 'exp_1',
@@ -740,30 +797,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const email = (result.user.email || '').toLowerCase().trim();
 
-      // Check if this Google email is registered by the Owner!
+      // If user is already logged in as Owner, link this Google Account for Spreadsheet sync
+      if (currentUser?.role === 'owner') {
+        const updatedUsers = users.map((u) => (u.id === currentUser.id ? { ...u, email } : u));
+        setUsers(updatedUsers);
+        const updatedUser = { ...currentUser, email };
+        setCurrentUser(updatedUser);
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
+        setSyncStatusMessage(`Terhubung ke Google (${email}). Auto-sync Google Sheet aktif.`);
+        return { success: true };
+      }
+
+      // Check if this Google email is registered by the Owner
       const registeredUser = users.find(
         (u) => (u.email || '').toLowerCase().trim() === email
       );
 
       if (!registeredUser) {
-        // Unregistered email! Reject login as requested
-        logoutGoogle();
+        // If owner exists and has default placeholder email or matches initial setup, link it
+        const defaultOwner = users.find((u) => u.role === 'owner');
+        if (defaultOwner && (!defaultOwner.email || defaultOwner.email.includes('andrygunawan'))) {
+          const updatedUsers = users.map((u) => (u.id === defaultOwner.id ? { ...u, email } : u));
+          setUsers(updatedUsers);
+          const updatedOwner = { ...defaultOwner, email };
+          setCurrentUser(updatedOwner);
+          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedOwner));
+          setSyncStatusMessage(`Terhubung ke Google (${email}). Masuk sebagai Owner.`);
+          return { success: true };
+        }
+
+        // Unregistered email for cashiers
+        await logoutGoogle();
         setGoogleUser(null);
         setGoogleAccessToken(null);
-        setCurrentUser(null);
-        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
         return {
           success: false,
-          message: `Email Google "${email}" belum terdaftar oleh Owner. Hanya akun yang telah didaftarkan oleh Pemilik Toko (Owner) yang dapat masuk ke sistem.`
+          message: `Email Google "${email}" belum terdaftar. Silakan minta Pemilik Toko (Owner) mendaftarkan email Anda di menu Pengaturan Pengguna.`
         };
       }
 
       if (registeredUser.isActive === false) {
-        logoutGoogle();
+        await logoutGoogle();
         setGoogleUser(null);
         setGoogleAccessToken(null);
-        setCurrentUser(null);
-        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
         return {
           success: false,
           message: `Akun Google "${email}" telah dinonaktifkan oleh Owner.`
@@ -773,11 +849,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Found registered user!
       setCurrentUser(registeredUser);
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(registeredUser));
+      setSyncStatusMessage(`Terhubung ke Google (${email})`);
       return { success: true };
     } catch (err: any) {
       console.error('Login Google failed:', err);
       return { success: false, message: err?.message || 'Terjadi kesalahan saat masuk dengan Google.' };
     }
+  };
+
+  const disconnectGoogle = async () => {
+    await logoutGoogle();
+    setGoogleUser(null);
+    setGoogleAccessToken(null);
+    setSyncStatusMessage('Koneksi Google Sheet diputuskan.');
   };
 
   const logout = () => {
@@ -791,7 +875,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addUser = (userData: Omit<UserAccount, 'id' | 'createdAt'>) => {
     const newUser: UserAccount = {
       ...userData,
-      id: `usr_${Date.now()}`,
+      id: generateUniqueId('usr'),
       isActive: true,
       createdAt: new Date().toISOString()
     };
@@ -843,7 +927,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const newTx: Transaction = {
       ...txData,
-      id: `tx_${Date.now()}`,
+      id: generateUniqueId('tx'),
       nomorStruk,
       waktu: now.toISOString(),
       tanggal: dateStr
@@ -888,7 +972,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const initialPayments = isSebagian && paidAmount > 0
         ? [
             {
-              id: `pay_dp_${Date.now()}`,
+              id: generateUniqueId('pay_dp'),
               waktu: newTx.waktu,
               nominal: paidAmount,
               metode: newTx.metodePembayaran,
@@ -899,7 +983,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         : [];
 
       const newDebt: DebtRecord = {
-        id: `debt_${Date.now()}`,
+        id: generateUniqueId('debt'),
         transaksiId: newTx.id,
         nomorStruk: newTx.nomorStruk,
         namaPelanggan: newTx.namaPelanggan || 'Pelanggan Tanpa Nama',
@@ -938,7 +1022,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const newStatus = newRemaining === 0 ? 'lunas' : 'sebagian';
 
         const paymentItem = {
-          id: `pay_${Date.now()}`,
+          id: generateUniqueId('pay'),
           waktu: new Date().toISOString(),
           nominal,
           metode,
@@ -962,7 +1046,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const now = new Date();
     const newExp: ExpenseRecord = {
       ...expData,
-      id: `exp_${Date.now()}`,
+      id: generateUniqueId('exp'),
       waktu: now.toISOString(),
       tanggal: getTodayDateStr(),
       kasirName: currentUser?.name || 'Kasir',
@@ -977,7 +1061,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Masters
   const addPpobRange = (item: Omit<MasterPPOBRange, 'id'>) => {
-    const newItem: MasterPPOBRange = { ...item, id: `rng_${Date.now()}` };
+    const newItem: MasterPPOBRange = { ...item, id: generateUniqueId('rng') };
     setPpobRanges((prev) => [...prev, newItem]);
   };
   const deletePpobRange = (id: string) => {
@@ -985,7 +1069,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addPpobLain = (item: Omit<MasterPPOBLain, 'id'>) => {
-    const newItem: MasterPPOBLain = { ...item, id: `pl_${Date.now()}` };
+    const newItem: MasterPPOBLain = { ...item, id: generateUniqueId('pl') };
     setPpobLains((prev) => [...prev, newItem]);
   };
   const deletePpobLain = (id: string) => {
@@ -993,7 +1077,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addBarang = (item: Omit<MasterBarang, 'id'>) => {
-    const newItem: MasterBarang = { ...item, id: `brg_${Date.now()}` };
+    const newItem: MasterBarang = { ...item, id: generateUniqueId('brg') };
     setBarangList((prev) => [...prev, newItem]);
   };
   const updateBarang = (item: MasterBarang) => {
@@ -1010,7 +1094,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addPsUnit = (unit: Omit<MasterPSUnit, 'id'>) => {
-    const newUnit: MasterPSUnit = { ...unit, id: `ps_${Date.now()}` };
+    const newUnit: MasterPSUnit = { ...unit, id: generateUniqueId('ps') };
     setPsUnits((prev) => [...prev, newUnit]);
   };
   const updatePsUnit = (unit: MasterPSUnit) => {
@@ -1046,7 +1130,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const newSession: PSRentalSession = {
-      id: `sess_${Date.now()}`,
+      id: generateUniqueId('sess'),
       unitId,
       namaUnit: unit.namaUnit,
       namaPelanggan: namaPelanggan.trim() || 'Pelanggan PS',
@@ -1248,7 +1332,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Add to deposit sisa waktu list
     const newRecord: PSSisaWaktuRecord = {
-      id: `sw_${Date.now()}`,
+      id: generateUniqueId('sw'),
       namaPelanggan: finalName,
       namaUnit: session.namaUnit,
       sisaMenit: Math.max(1, sisaMenit),
@@ -1333,15 +1417,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSettings((prev) => ({ ...prev, ...newSettings }));
   };
 
-  const triggerGoogleSheetSync = async (silent: boolean = false): Promise<boolean> => {
+  const triggerGoogleSheetSync = async (
+    silent: boolean = false,
+    interactive: boolean = false
+  ): Promise<boolean> => {
     let token = googleAccessToken;
     if (!token) {
       token = await getAccessToken();
     }
 
+    if (!token && interactive) {
+      const loginRes = await loginGoogle();
+      if (loginRes.success) {
+        token = await getAccessToken();
+      }
+    }
+
     if (!token) {
       if (!silent) {
-        setSyncStatusMessage('Belum terhubung ke Akun Google. Silakan login terlebih dahulu.');
+        setSyncStatusMessage('Belum terhubung ke Akun Google. Silakan klik "Hubungkan Akun Google".');
       }
       return false;
     }
@@ -1352,14 +1446,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         setIsSyncing(true);
         setSyncStatusMessage('Membuat Google Spreadsheet baru di Drive...');
-        const created = await createStoreSpreadsheet(token, `POS_${settings.namaToko.replace(/\s+/g, '_')}`);
+        const created = await createStoreSpreadsheet(
+          token,
+          `POS_${settings.namaToko.replace(/\s+/g, '_')}`
+        );
         sheetId = created.spreadsheetId;
         updateSettings({
           spreadsheetId: sheetId,
-          spreadsheetUrl: created.spreadsheetUrl
+          spreadsheetUrl: created.spreadsheetUrl,
+          autoSyncSheets: true
         });
       } catch (err: any) {
         setIsSyncing(false);
+        if (err?.message?.includes('AUTH_EXPIRED') || err?.message?.includes('401')) {
+          setGoogleAccessToken(null);
+          await logoutGoogle();
+        }
         if (!silent) setSyncStatusMessage(`Gagal membuat spreadsheet: ${err.message}`);
         return false;
       }
@@ -1381,7 +1483,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setIsSyncing(false);
     if (result.success) {
-      const nowTime = new Date().toLocaleTimeString('id-ID');
+      const nowTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       setSyncStatusMessage(`Otomatis tersinkron pukul ${nowTime}`);
       updateSettings({
         lastSyncedAt: new Date().toISOString(),
@@ -1389,29 +1491,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       return true;
     } else {
-      if (!silent) {
+      if (result.isTokenExpired) {
+        setGoogleAccessToken(null);
+        await logoutGoogle();
+        setSyncStatusMessage('Sesi Google kedaluwarsa. Silakan hubungkan ulang akun Google.');
+      } else if (!silent) {
         setSyncStatusMessage(`Sinkron gagal: ${result.message}`);
       }
       return false;
     }
   };
-
-  // Background debounced auto-sync to Google Sheet whenever transactions, expenses, debts, or masters change
-  const isInitialSyncMount = React.useRef(true);
-  useEffect(() => {
-    if (isInitialSyncMount.current) {
-      isInitialSyncMount.current = false;
-      return;
-    }
-    // Only auto sync if Google account is connected
-    if (!googleUser && !googleAccessToken) return;
-
-    const timer = setTimeout(() => {
-      triggerGoogleSheetSync(true);
-    }, 2500);
-
-    return () => clearTimeout(timer);
-  }, [transactions, expenses, debts, barangList, bbmList, ppobRanges, ppobLains]);
 
   const createNewGoogleSheet = async (): Promise<string | null> => {
     let token = googleAccessToken;
@@ -1419,21 +1508,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       token = await getAccessToken();
     }
     if (!token) {
+      const loginRes = await loginGoogle();
+      if (loginRes.success) {
+        token = await getAccessToken();
+      }
+    }
+    if (!token) {
       throw new Error('Harap login dengan Akun Google terlebih dahulu.');
     }
 
     setIsSyncing(true);
-    setSyncStatusMessage('Membuat spreadsheet baru...');
+    setSyncStatusMessage('Membuat spreadsheet baru di Google Drive...');
     try {
       const res = await createStoreSpreadsheet(token, `POS_${settings.namaToko.replace(/\s+/g, '_')}`);
       updateSettings({
         spreadsheetId: res.spreadsheetId,
         spreadsheetUrl: res.spreadsheetUrl,
+        autoSyncSheets: true,
         lastSyncedAt: new Date().toISOString()
       });
       setIsSyncing(false);
       setSyncStatusMessage('Spreadsheet baru berhasil dibuat dan ditautkan!');
-      // Trigger initial sync
+      // Trigger initial sync to write all existing data
       await triggerGoogleSheetSync();
       return res.spreadsheetId;
     } catch (err: any) {
@@ -1443,15 +1539,90 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Automatic Background Synchronization to Google Sheet when transactions/data mutate
-  useEffect(() => {
-    if (googleAccessToken && settings.autoSyncSheets && settings.spreadsheetId) {
-      const syncTimeout = setTimeout(() => {
-        triggerGoogleSheetSync().catch(() => {});
-      }, 2500);
-      return () => clearTimeout(syncTimeout);
+  const pullDataFromGoogleSheet = async (): Promise<{ success: boolean; message: string }> => {
+    let token = googleAccessToken;
+    if (!token) {
+      token = await getAccessToken();
     }
-  }, [transactions, debts, expenses, activePsSessions, barangList, bbmList, googleAccessToken, settings.spreadsheetId]);
+    if (!token) {
+      const loginRes = await loginGoogle();
+      if (loginRes.success) {
+        token = await getAccessToken();
+      }
+    }
+    if (!token) {
+      return { success: false, message: 'Harap hubungkan Akun Google terlebih dahulu.' };
+    }
+
+    const sheetId = settings.spreadsheetId;
+    if (!sheetId) {
+      return { success: false, message: 'Belum ada Spreadsheet yang ditautkan.' };
+    }
+
+    setIsSyncing(true);
+    setSyncStatusMessage('Mengunduh data dari Google Spreadsheet...');
+    try {
+      const res = await pullAllFromGoogleSheet(token, sheetId);
+      setIsSyncing(false);
+      if (res.success && res.data) {
+        if (res.data.transaksi.length > 0) setTransactions(res.data.transaksi);
+        if (res.data.pengeluaran.length > 0) setExpenses(res.data.pengeluaran);
+        if (res.data.hutang.length > 0) setDebts(res.data.hutang);
+        if (res.data.barang.length > 0) setBarangList(res.data.barang);
+        if (res.data.bbm.length > 0) setBbmList(res.data.bbm);
+        if (res.data.ppobRange.length > 0) setPpobRanges(res.data.ppobRange);
+        if (res.data.ppobLain.length > 0) setPpobLains(res.data.ppobLain);
+
+        const nowTime = new Date().toLocaleTimeString('id-ID');
+        setSyncStatusMessage(`Database berhasil dimuat dari Spreadsheet pukul ${nowTime}!`);
+        return { success: true, message: res.message };
+      } else {
+        if (res.isTokenExpired) {
+          setGoogleAccessToken(null);
+          await logoutGoogle();
+        }
+        setSyncStatusMessage(`Gagal memuat: ${res.message}`);
+        return { success: false, message: res.message };
+      }
+    } catch (err: any) {
+      setIsSyncing(false);
+      setSyncStatusMessage(`Gagal: ${err.message}`);
+      return { success: false, message: err.message };
+    }
+  };
+
+  // Background debounced auto-sync to Google Sheet whenever any store data changes
+  const isInitialSyncMount = useRef(true);
+  useEffect(() => {
+    if (isInitialSyncMount.current) {
+      isInitialSyncMount.current = false;
+      return;
+    }
+
+    // Auto sync requires active token and autoSyncSheets enabled
+    const token = googleAccessToken || (typeof window !== 'undefined' ? localStorage.getItem('pos_google_access_token') : null);
+    if (!token || settings.autoSyncSheets === false) return;
+
+    const timer = setTimeout(() => {
+      triggerGoogleSheetSync(true).catch((e) => {
+        console.warn('Auto-sync background check:', e);
+      });
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [
+    transactions,
+    expenses,
+    debts,
+    barangList,
+    bbmList,
+    ppobRanges,
+    ppobLains,
+    activePsSessions,
+    googleAccessToken,
+    settings.autoSyncSheets,
+    settings.spreadsheetId
+  ]);
 
   return (
     <AppContext.Provider
@@ -1529,6 +1700,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         syncStatusMessage,
         triggerGoogleSheetSync,
         createNewGoogleSheet,
+        pullDataFromGoogleSheet,
+        disconnectGoogle,
 
         isNewTxModalOpen,
         openNewTxModal,

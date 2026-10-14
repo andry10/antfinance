@@ -69,18 +69,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth }) => {
 
         {/* Google Sheet Sync Status Button */}
         <button
-          onClick={() => triggerGoogleSheetSync()}
+          type="button"
+          onClick={() => triggerGoogleSheetSync(false, true)}
           disabled={isSyncing}
           title={syncStatusMessage}
-          className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
             googleUser
-              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+              : 'bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
           }`}
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-emerald-600' : googleUser ? 'text-emerald-600' : 'text-slate-500'}`} />
-          <span className="truncate max-w-[120px]">
-            {isSyncing ? 'Sync...' : googleUser ? 'Google Sheet Aktif' : 'Sync Sheet'}
+          <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-emerald-600' : googleUser ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`} />
+          <span className="truncate max-w-[130px] hidden sm:inline">
+            {isSyncing ? 'Sync...' : googleUser ? 'Google Sheet Aktif' : 'Hubungkan Sheet'}
           </span>
         </button>
 

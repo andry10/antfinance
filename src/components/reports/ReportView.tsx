@@ -267,7 +267,8 @@ export const ReportView: React.FC = () => {
 
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => triggerGoogleSheetSync()}
+            type="button"
+            onClick={() => triggerGoogleSheetSync(false, true)}
             disabled={isSyncing}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-xs transition-colors"
           >
@@ -725,8 +726,8 @@ export const ReportView: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  tableTransactions.map((tx) => (
-                    <tr key={`report-tx-${tx.id}`} className="hover:bg-slate-50/70 transition-colors">
+                  tableTransactions.map((tx, idx) => (
+                    <tr key={`report-tx-${tx.id || 'tx'}-${idx}`} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-2.5 px-3 font-bold text-slate-900">{tx.nomorStruk}</td>
                       <td className="py-2.5 px-3 text-slate-500 font-sans text-[11px] whitespace-nowrap">
                         {formatDateTime(tx.waktu)}
@@ -798,8 +799,8 @@ export const ReportView: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredExpenses.map((exp) => (
-                    <tr key={exp.id} className="hover:bg-slate-50/70">
+                  filteredExpenses.map((exp, idx) => (
+                    <tr key={`report-exp-${exp.id || 'exp'}-${idx}`} className="hover:bg-slate-50/70">
                       <td className="py-2.5 px-3 text-slate-500 font-mono text-[11px]">
                         {formatDateTime(exp.waktu)}
                       </td>
@@ -862,8 +863,8 @@ export const ReportView: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  filteredDebts.map((d) => (
-                    <tr key={d.id} className="hover:bg-slate-50/70">
+                  filteredDebts.map((d, idx) => (
+                    <tr key={`report-debt-${d.id || 'debt'}-${idx}`} className="hover:bg-slate-50/70">
                       <td className="py-2.5 px-3 font-bold text-slate-900">{d.namaPelanggan}</td>
                       <td className="py-2.5 px-3 text-slate-500 font-mono text-[11px]">{d.noHpPelanggan || '-'}</td>
                       <td className="py-2.5 px-3 text-slate-600">{formatDate(d.tanggalTransaksi)}</td>
@@ -1040,7 +1041,7 @@ export const ReportView: React.FC = () => {
                         </tr>
                       ) : (
                         filteredTxs.map((tx, idx) => (
-                          <tr key={`report-tx-detail-${tx.id}`} className="hover:bg-slate-50">
+                          <tr key={`report-tx-detail-${tx.id || 'tx'}-${idx}`} className="hover:bg-slate-50">
                             <td className="p-1 text-slate-500">{idx + 1}</td>
                             <td className="p-1 font-mono">
                               <div className="font-bold">{tx.nomorStruk}</div>

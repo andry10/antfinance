@@ -17,23 +17,40 @@ provider.addScope('https://www.googleapis.com/auth/spreadsheets');
 provider.addScope('https://www.googleapis.com/auth/drive.file');
 
 let isSigningIn = false;
-let cachedAccessToken: string | null = null;
+let cachedAccessToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('pos_google_access_token') : null;
 
 export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
+  onAuthSuccess?: (user: any, token: string) => void,
   onAuthFailure?: () => void
 ) => {
+  // If we already have token and user in localStorage, restore immediately
+  if (typeof window !== 'undefined') {
+    const savedToken = localStorage.getItem('pos_google_access_token');
+    const savedUser = localStorage.getItem('pos_google_user');
+    if (savedToken && savedUser) {
+      try {
+        const userObj = JSON.parse(savedUser);
+        cachedAccessToken = savedToken;
+        if (onAuthSuccess) onAuthSuccess(userObj, savedToken);
+      } catch (e) {}
+    }
+  }
+
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else if (!isSigningIn) {
+      const token = cachedAccessToken || (typeof window !== 'undefined' ? localStorage.getItem('pos_google_access_token') : null) || '';
+      if (token) {
+        cachedAccessToken = token;
+        if (onAuthSuccess) onAuthSuccess(user, token);
+      } else {
+        if (onAuthSuccess) onAuthSuccess(user, '');
+      }
+    } else {
+      const hasStoredToken = typeof window !== 'undefined' && !!localStorage.getItem('pos_google_access_token');
+      if (!hasStoredToken) {
         cachedAccessToken = null;
         if (onAuthFailure) onAuthFailure();
       }
-    } else {
-      cachedAccessToken = null;
-      if (onAuthFailure) onAuthFailure();
     }
   });
 };
@@ -48,6 +65,18 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     }
 
     cachedAccessToken = credential.accessToken;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pos_google_access_token', credential.accessToken);
+      localStorage.setItem(
+        'pos_google_user',
+        JSON.stringify({
+          uid: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName,
+          photoURL: result.user.photoURL
+        })
+      );
+    }
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
     console.error('Google Sign-in error:', error);
@@ -58,14 +87,35 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
-  return cachedAccessToken;
+  if (cachedAccessToken) return cachedAccessToken;
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('pos_google_access_token');
+    if (saved) {
+      cachedAccessToken = saved;
+      return saved;
+    }
+  }
+  return null;
 };
 
 export const setManualAccessToken = (token: string | null) => {
   cachedAccessToken = token;
+  if (typeof window !== 'undefined') {
+    if (token) {
+      localStorage.setItem('pos_google_access_token', token);
+    } else {
+      localStorage.removeItem('pos_google_access_token');
+    }
+  }
 };
 
 export const logoutGoogle = async () => {
-  await signOut(auth);
+  try {
+    await signOut(auth);
+  } catch (e) {}
   cachedAccessToken = null;
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('pos_google_access_token');
+    localStorage.removeItem('pos_google_user');
+  }
 };
