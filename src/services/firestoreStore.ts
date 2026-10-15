@@ -61,10 +61,13 @@ export async function fetchStoreFromFirestore(): Promise<StoreCloudData | null> 
  */
 export async function saveStoreToFirestore(data: StoreCloudData): Promise<boolean> {
   try {
-    await setDoc(storeRef, {
-      ...data,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
+    const cleanData = JSON.parse(
+      JSON.stringify({
+        ...data,
+        updatedAt: new Date().toISOString()
+      })
+    );
+    await setDoc(storeRef, cleanData, { merge: true });
     return true;
   } catch (err: any) {
     if (err?.code === 'unavailable' || err?.message?.includes('offline')) {

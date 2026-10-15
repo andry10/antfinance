@@ -121,6 +121,7 @@ interface AppContextType {
   // Store Settings & Google Sheets Sync
   settings: StoreSettings;
   updateSettings: (newSettings: Partial<StoreSettings>) => void;
+  resetDatabase: () => Promise<void>;
   isSyncing: boolean;
   syncStatusMessage: string;
   isGoogleTokenExpired: boolean;
@@ -1538,6 +1539,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSettings((prev) => ({ ...prev, ...newSettings }));
   };
 
+  const resetDatabase = async () => {
+    setTransactions([]);
+    setExpenses([]);
+    setDebts([]);
+    setActivePsSessions([]);
+    setPsSisaWaktuList([]);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
+      localStorage.removeItem(STORAGE_KEYS.EXPENSES);
+      localStorage.removeItem(STORAGE_KEYS.DEBTS);
+      localStorage.removeItem(STORAGE_KEYS.PS_SESSIONS);
+      localStorage.removeItem(STORAGE_KEYS.PS_SISA_WAKTU);
+
+      await saveStoreToFirestore({
+        transactions: [],
+        expenses: [],
+        debts: [],
+        ppobRanges,
+        ppobLains,
+        barangList,
+        bbmList,
+        psUnits,
+        activePsSessions: [],
+        psSisaWaktuList: [],
+        users,
+        settings
+      });
+      setSyncStatusMessage('Database berhasil direset (transaksi dibersihkan, akun tetap aman).');
+    } catch (err: any) {
+      console.error('Failed to reset database:', err);
+    }
+  };
+
   const triggerGoogleSheetSync = async (
     silent: boolean = false,
     interactive: boolean = false,
@@ -1803,17 +1837,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSyncStatusMessage('Menghubungkan ke Cloud Database (Firebase)...');
         const cloudData = await fetchStoreFromFirestore();
         if (cloudData && isMounted) {
-          if (cloudData.transactions && cloudData.transactions.length > 0) setTransactions(cloudData.transactions);
-          if (cloudData.expenses && cloudData.expenses.length > 0) setExpenses(cloudData.expenses);
-          if (cloudData.debts && cloudData.debts.length > 0) setDebts(cloudData.debts);
-          if (cloudData.ppobRanges && cloudData.ppobRanges.length > 0) setPpobRanges(cloudData.ppobRanges);
-          if (cloudData.ppobLains && cloudData.ppobLains.length > 0) setPpobLains(cloudData.ppobLains);
-          if (cloudData.barangList && cloudData.barangList.length > 0) setBarangList(cloudData.barangList);
-          if (cloudData.bbmList && cloudData.bbmList.length > 0) setBbmList(cloudData.bbmList);
-          if (cloudData.psUnits && cloudData.psUnits.length > 0) setPsUnits(cloudData.psUnits);
-          if (cloudData.activePsSessions) setActivePsSessions(cloudData.activePsSessions);
-          if (cloudData.psSisaWaktuList) setPsSisaWaktuList(cloudData.psSisaWaktuList);
-          if (cloudData.users && cloudData.users.length > 0) setUsers(cloudData.users);
+          if (cloudData.transactions !== undefined) setTransactions(cloudData.transactions || []);
+          if (cloudData.expenses !== undefined) setExpenses(cloudData.expenses || []);
+          if (cloudData.debts !== undefined) setDebts(cloudData.debts || []);
+          if (cloudData.ppobRanges !== undefined) setPpobRanges(cloudData.ppobRanges || []);
+          if (cloudData.ppobLains !== undefined) setPpobLains(cloudData.ppobLains || []);
+          if (cloudData.barangList !== undefined) setBarangList(cloudData.barangList || []);
+          if (cloudData.bbmList !== undefined) setBbmList(cloudData.bbmList || []);
+          if (cloudData.psUnits !== undefined) setPsUnits(cloudData.psUnits || []);
+          if (cloudData.activePsSessions !== undefined) setActivePsSessions(cloudData.activePsSessions || []);
+          if (cloudData.psSisaWaktuList !== undefined) setPsSisaWaktuList(cloudData.psSisaWaktuList || []);
+          if (cloudData.users !== undefined && cloudData.users.length > 0) setUsers(cloudData.users);
           if (cloudData.settings) setSettings((prev) => ({ ...prev, ...cloudData.settings }));
           setSyncStatusMessage('Cloud Database aktif & tersinkron otomatis');
         }
@@ -1826,17 +1860,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Real-time subscription across devices (instant sync when PC, desktop, or mobile adds/changes data)
     const unsubscribe = subscribeStoreFirestore((cloudData) => {
       if (!isMounted) return;
-      if (cloudData.transactions) setTransactions(cloudData.transactions);
-      if (cloudData.expenses) setExpenses(cloudData.expenses);
-      if (cloudData.debts) setDebts(cloudData.debts);
-      if (cloudData.ppobRanges) setPpobRanges(cloudData.ppobRanges);
-      if (cloudData.ppobLains) setPpobLains(cloudData.ppobLains);
-      if (cloudData.barangList) setBarangList(cloudData.barangList);
-      if (cloudData.bbmList) setBbmList(cloudData.bbmList);
-      if (cloudData.psUnits) setPsUnits(cloudData.psUnits);
-      if (cloudData.activePsSessions) setActivePsSessions(cloudData.activePsSessions);
-      if (cloudData.psSisaWaktuList) setPsSisaWaktuList(cloudData.psSisaWaktuList);
-      if (cloudData.users) setUsers(cloudData.users);
+      if (cloudData.transactions !== undefined) setTransactions(cloudData.transactions || []);
+      if (cloudData.expenses !== undefined) setExpenses(cloudData.expenses || []);
+      if (cloudData.debts !== undefined) setDebts(cloudData.debts || []);
+      if (cloudData.ppobRanges !== undefined) setPpobRanges(cloudData.ppobRanges || []);
+      if (cloudData.ppobLains !== undefined) setPpobLains(cloudData.ppobLains || []);
+      if (cloudData.barangList !== undefined) setBarangList(cloudData.barangList || []);
+      if (cloudData.bbmList !== undefined) setBbmList(cloudData.bbmList || []);
+      if (cloudData.psUnits !== undefined) setPsUnits(cloudData.psUnits || []);
+      if (cloudData.activePsSessions !== undefined) setActivePsSessions(cloudData.activePsSessions || []);
+      if (cloudData.psSisaWaktuList !== undefined) setPsSisaWaktuList(cloudData.psSisaWaktuList || []);
+      if (cloudData.users !== undefined && cloudData.users.length > 0) setUsers(cloudData.users);
       if (cloudData.settings) setSettings((prev) => ({ ...prev, ...cloudData.settings }));
     });
 
@@ -1961,6 +1995,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         settings,
         updateSettings,
+        resetDatabase,
         isSyncing,
         syncStatusMessage,
         isGoogleTokenExpired: isGoogleTokenExpiredState,

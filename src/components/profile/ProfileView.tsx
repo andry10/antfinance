@@ -36,6 +36,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenAuthModal }) => 
     updateUserProfile,
     toggleUserActive,
     resetUserPassword,
+    resetDatabase,
     settings,
     updateSettings,
     logout
@@ -437,8 +438,32 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenAuthModal }) => 
               </div>
             </div>
 
-            {/* Kolom 3: Kelola Karyawan (Owner Only: Tambah, Reset Pass, Aktif/Nonaktif) */}
+            {/* Kolom 3: Kelola Karyawan & Reset Database (Owner Only) */}
             <div className="space-y-6">
+              {isOwner && (
+                <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 rounded-2xl p-5 shadow-sm space-y-3">
+                  <h2 className="font-bold text-sm text-rose-800 dark:text-rose-300 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600" />
+                    <span>Reset Database & Sinkronisasi</span>
+                  </h2>
+                  <p className="text-xs text-rose-700 dark:text-rose-400 leading-relaxed">
+                    Jika data di HP dan Desktop tidak sama, Anda dapat mereset database agar seluruh transaksi dikosongkan bersih dan tersinkron ulang ke semua perangkat. Akun pengguna (owner & kasir) tetap aman.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (window.confirm('PERINGATAN: Apakah Anda yakin ingin mereset database? Seluruh transaksi & sesi rental akan dikosongkan agar tersinkron bersih di semua perangkat, namun Akun Pengguna tetap aman.')) {
+                        await resetDatabase();
+                        alert('Database berhasil direset dan disinkronkan ke semua perangkat!');
+                      }
+                    }}
+                    className="w-full py-2 px-4 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow transition-colors"
+                  >
+                    🔄 Reset Database (Kosongkan Transaksi, Akun Tetap)
+                  </button>
+                </div>
+              )}
+
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
                 <h2 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
                   <Users className="w-4 h-4 text-emerald-600" />
