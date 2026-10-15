@@ -17,7 +17,7 @@ import {
 
 export const db = getFirestore(app);
 
-const STORE_DOC_ID = 'pos_main_store_v2';
+const STORE_DOC_ID = 'pos_main_store_v5';
 const storeRef = doc(db, 'stores', STORE_DOC_ID);
 
 export interface StoreCloudData {
