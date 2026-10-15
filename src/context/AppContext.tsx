@@ -147,20 +147,20 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 const STORAGE_KEYS = {
-  USERS: 'pos_users_v2',
-  CURRENT_USER: 'pos_current_user_v2',
-  TRANSACTIONS: 'pos_transactions_v2',
-  DEBTS: 'pos_debts_v2',
-  EXPENSES: 'pos_expenses_v2',
-  PPOB_RANGES: 'pos_ppob_ranges_v2',
-  PPOB_LAIN: 'pos_ppob_lain_v2',
-  BARANG: 'pos_barang_v2',
-  BBM: 'pos_bbm_v2',
-  PS_UNITS: 'pos_ps_units_v2',
-  PS_SESSIONS: 'pos_ps_sessions_v2',
-  PS_SISA_WAKTU: 'pos_ps_sisa_waktu_v2',
-  SETTINGS: 'pos_settings_v2',
-  DARK_MODE: 'pos_dark_mode_v2'
+  USERS: 'pos_users_v3',
+  CURRENT_USER: 'pos_current_user_v3',
+  TRANSACTIONS: 'pos_transactions_v3',
+  DEBTS: 'pos_debts_v3',
+  EXPENSES: 'pos_expenses_v3',
+  PPOB_RANGES: 'pos_ppob_ranges_v3',
+  PPOB_LAIN: 'pos_ppob_lain_v3',
+  BARANG: 'pos_barang_v3',
+  BBM: 'pos_bbm_v3',
+  PS_UNITS: 'pos_ps_units_v3',
+  PS_SESSIONS: 'pos_ps_sessions_v3',
+  PS_SISA_WAKTU: 'pos_ps_sisa_waktu_v3',
+  SETTINGS: 'pos_settings_v3',
+  DARK_MODE: 'pos_dark_mode_v3'
 };
 
 const getTodayDateStr = () => {
@@ -2063,7 +2063,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }).catch((e) => {
         console.warn('Auto-save to Firestore:', e);
       });
-    }, 600);
+    }, 100);
 
     return () => clearTimeout(timer);
   }, [
