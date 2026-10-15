@@ -1580,6 +1580,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsSyncing(true);
       const cloudData = await forceFetchStoreFromFirestore();
       if (cloudData) {
+        isRemoteUpdateRef.current = true;
         if (cloudData.transactions !== undefined) {
           setTransactions(cloudData.transactions || []);
           localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(cloudData.transactions || []));
@@ -1905,6 +1906,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSyncStatusMessage('Menghubungkan ke Cloud Database (Firebase)...');
         const cloudData = await fetchStoreFromFirestore();
         if (cloudData && isMounted) {
+          isRemoteUpdateRef.current = true;
           if (cloudData.transactions !== undefined) {
             setTransactions(cloudData.transactions || []);
             localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(cloudData.transactions || []));
@@ -1950,8 +1952,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(cloudData.users));
           }
           if (cloudData.settings) {
-            setSettings((prev) => ({ ...prev, ...cloudData.settings }));
-            localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify({ ...settings, ...cloudData.settings }));
+            isRemoteUpdateRef.current = true;
+            setSettings((prev) => {
+              const nextSettings = { ...prev, ...cloudData.settings };
+              localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(nextSettings));
+              return nextSettings;
+            });
           }
           setSyncStatusMessage('Cloud Database aktif & tersinkron otomatis');
         } else if (isMounted) {
@@ -1982,6 +1988,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Real-time subscription across devices (instant sync when PC, desktop, or mobile adds/changes data)
     const unsubscribe = subscribeStoreFirestore((cloudData) => {
       if (!isMounted) return;
+      isRemoteUpdateRef.current = true;
       if (cloudData.transactions !== undefined) {
         setTransactions(cloudData.transactions || []);
         localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(cloudData.transactions || []));
@@ -2057,10 +2064,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // Background debounced auto-save to Firebase Firestore whenever store data changes
+  const isRemoteUpdateRef = useRef(false);
   const isInitialCloudSaveMount = useRef(true);
   useEffect(() => {
     if (isInitialCloudSaveMount.current) {
       isInitialCloudSaveMount.current = false;
+      return;
+    }
+    if (isRemoteUpdateRef.current) {
+      isRemoteUpdateRef.current = false;
       return;
     }
 
