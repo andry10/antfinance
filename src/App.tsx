@@ -20,6 +20,7 @@ import { NewTransactionModal } from './components/transaction/NewTransactionModa
 import { ReceiptModal } from './components/receipt/ReceiptModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { LoginPage } from './components/auth/LoginPage';
+import { PSExpirationMonitor } from './components/playstation/PSExpirationMonitor';
 import { Transaction } from './types';
 
 const MainLayout: React.FC = () => {
@@ -57,7 +58,7 @@ const MainLayout: React.FC = () => {
       {/* Main Container: Fixed Sidebar on Left, Only Content Scrolls on Right */}
       <div className="flex-1 flex w-full overflow-hidden relative">
         {/* Desktop Sidebar (Fixed Left Nav) */}
-        <div className="hidden md:block w-64 shrink-0 h-full border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 z-20">
+        <div className="hidden md:block w-64 shrink-0 h-full border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 z-20 no-print">
           <Sidebar />
         </div>
 
@@ -82,9 +83,14 @@ const MainLayout: React.FC = () => {
         </main>
       </div>
 
+      {/* Global PlayStation Rental Expiration Monitor (Waktu berhenti, auto selesai jika lunas diawal, notif & suara jika belum bayar) */}
+      <PSExpirationMonitor
+        onSessionAutoFinished={(tx) => setSavedNotificationTx(tx)}
+      />
+
       {/* Floating Success Toast when Transaction Saved (Shows Cetak Struk Icon Option) */}
       {savedNotificationTx && (
-        <div className="fixed bottom-20 md:bottom-6 right-4 z-50 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 shadow-xl rounded-2xl p-3.5 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed bottom-20 md:bottom-6 right-4 z-50 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 shadow-xl rounded-2xl p-3.5 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300 no-print">
           <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
             <span className="text-lg">✓</span>
           </div>

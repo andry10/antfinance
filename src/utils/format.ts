@@ -85,4 +85,9 @@ export const parseThousandInput = (val: string | number | undefined | null): num
   const clean = String(val).replace(/\D/g, '');
   return clean ? parseInt(clean, 10) : 0;
 };
-
+export const getLocalDateStr = (d: Date = new Date()): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};

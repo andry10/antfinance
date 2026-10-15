@@ -10,11 +10,12 @@ import {
   AlertCircle,
   ArrowDownCircle,
   UserCog,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
 
 export const BottomNav: React.FC = () => {
-  const { activeTab, setActiveTab, debts, barangList, currentUser } = useApp();
+  const { activeTab, setActiveTab, debts, barangList, currentUser, logout } = useApp();
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
   const unpaidDebtsCount = debts.filter((d) => d.status !== 'lunas').length;
@@ -125,6 +126,27 @@ export const BottomNav: React.FC = () => {
                 );
               })}
             </div>
+
+            {currentUser && (
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                <div className="text-xs">
+                  <div className="font-bold text-slate-800">{currentUser.name}</div>
+                  <div className="text-[11px] text-slate-400 capitalize">{currentUser.role}</div>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    if (window.confirm('Apakah Anda yakin ingin keluar (logout)?')) {
+                      logout();
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Keluar (Logout)</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

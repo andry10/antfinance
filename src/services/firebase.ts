@@ -55,9 +55,28 @@ export const initAuth = (
   });
 };
 
+export const isGoogleTokenExpired = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const timeStr = localStorage.getItem('pos_google_token_time');
+  if (!timeStr) return false;
+  const time = parseInt(timeStr, 10);
+  if (isNaN(time)) return false;
+  // Consider expired after 50 minutes (Google OAuth token valid for 60 min)
+  return Date.now() - time > 50 * 60 * 1000;
+};
+
+export const clearGoogleTokenOnly = () => {
+  cachedAccessToken = null;
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('pos_google_access_token');
+    localStorage.removeItem('pos_google_token_time');
+  }
+};
+
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
   try {
     isSigningIn = true;
+    provider.setCustomParameters({ prompt: 'select_account' });
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (!credential?.accessToken) {
@@ -67,6 +86,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     cachedAccessToken = credential.accessToken;
     if (typeof window !== 'undefined') {
       localStorage.setItem('pos_google_access_token', credential.accessToken);
+      localStorage.setItem('pos_google_token_time', Date.now().toString());
       localStorage.setItem(
         'pos_google_user',
         JSON.stringify({
@@ -87,6 +107,10 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
+  if (isGoogleTokenExpired()) {
+    clearGoogleTokenOnly();
+    return null;
+  }
   if (cachedAccessToken) return cachedAccessToken;
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem('pos_google_access_token');
@@ -103,8 +127,10 @@ export const setManualAccessToken = (token: string | null) => {
   if (typeof window !== 'undefined') {
     if (token) {
       localStorage.setItem('pos_google_access_token', token);
+      localStorage.setItem('pos_google_token_time', Date.now().toString());
     } else {
       localStorage.removeItem('pos_google_access_token');
+      localStorage.removeItem('pos_google_token_time');
     }
   }
 };
@@ -116,6 +142,7 @@ export const logoutGoogle = async () => {
   cachedAccessToken = null;
   if (typeof window !== 'undefined') {
     localStorage.removeItem('pos_google_access_token');
+    localStorage.removeItem('pos_google_token_time');
     localStorage.removeItem('pos_google_user');
   }
 };

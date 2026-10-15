@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { formatRupiah, formatNumber, formatDate, formatDateTime } from '../../utils/format';
+import { formatRupiah, formatNumber, formatDate, formatDateTime, getLocalDateStr } from '../../utils/format';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
@@ -26,15 +26,51 @@ import {
 } from 'lucide-react';
 
 export const ReportView: React.FC = () => {
-  const { transactions, expenses, debts, bbmList, settings, triggerGoogleSheetSync, isSyncing } = useApp();
+  const { transactions, expenses, debts, bbmList, settings, currentUser, triggerGoogleSheetSync, isSyncing } = useApp();
 
-  const getTodayStr = () => new Date().toISOString().split('T')[0];
+  const getTodayStr = () => getLocalDateStr();
 
   // Print Preview Modal State
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const pdfRef = useRef<HTMLDivElement>(null);
+
+  // Standard A4 Browser Print handler (like Ctrl+P)
+  const handlePrintA4 = () => {
+    setShowPrintPreview(false);
+    setShowPdfPreview(false);
+    document.body.classList.add('print-report-a4');
+    document.body.classList.remove('print-receipt-58mm');
+
+    const dynamicA4Style = document.createElement('style');
+    dynamicA4Style.id = 'report-a4-dynamic-style';
+    dynamicA4Style.innerHTML = `@page { size: A4 portrait; margin: 12mm 10mm; }`;
+    document.head.appendChild(dynamicA4Style);
+
+    const cleanUp = () => {
+      document.body.classList.remove('print-report-a4');
+      const el = document.getElementById('report-a4-dynamic-style');
+      if (el) el.remove();
+      window.removeEventListener('afterprint', cleanUp);
+    };
+
+    window.addEventListener('afterprint', cleanUp);
+    window.print();
+    setTimeout(cleanUp, 3500);
+  };
+
+  // Keyboard shortcut Ctrl+P or Cmd+P
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        handlePrintA4();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleDownloadPdf = async () => {
     if (!pdfRef.current) return;
@@ -108,7 +144,7 @@ export const ReportView: React.FC = () => {
   const setPresetYesterday = () => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    const yest = d.toISOString().split('T')[0];
+    const yest = getLocalDateStr(d);
     setStartDate(yest);
     setEndDate(yest);
   };
@@ -117,7 +153,7 @@ export const ReportView: React.FC = () => {
     const today = getTodayStr();
     const d = new Date();
     d.setDate(d.getDate() - 6);
-    setStartDate(d.toISOString().split('T')[0]);
+    setStartDate(getLocalDateStr(d));
     setEndDate(today);
   };
 
@@ -248,7 +284,7 @@ export const ReportView: React.FC = () => {
   }, [filteredTxs, categoryFilter, tableSearch]);
 
   return (
-    <div className="p-3 md:p-6 max-w-7xl mx-auto space-y-6 pb-24 md:pb-12 print-area">
+    <div className="p-3 md:p-6 max-w-7xl mx-auto space-y-6 pb-24 md:pb-12 report-a4-container">
       {/* Title & Top Action Buttons (Soft Colors) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
         <div>
@@ -285,11 +321,12 @@ export const ReportView: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setShowPrintPreview(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-800 text-white hover:bg-slate-900 shadow-xs transition-colors"
+            onClick={handlePrintA4}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-900 text-white hover:bg-slate-800 shadow-xs transition-colors cursor-pointer"
+            title="Cetak Laporan ke Kertas A4 Default Browser (atau tekan Ctrl+P)"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Cetak Rekap</span>
+            <span>Cetak A4 (Ctrl+P)</span>
           </button>
 
           <button
@@ -378,13 +415,33 @@ export const ReportView: React.FC = () => {
         </div>
       </div>
 
-      {/* Printable Header Notice (Print only) */}
-      <div className="hidden print:block border-b pb-4 mb-4 text-center">
-        <h2 className="text-xl font-bold uppercase">{settings.namaToko || 'POS Usaha Terpadu'}</h2>
-        <p className="text-xs text-slate-600">{settings.alamat} · Telp: {settings.noTelepon}</p>
-        <p className="text-sm font-semibold mt-2">
-          REKAPITULASI LAPORAN LABA RUGI PERIODE: {startDate ? formatDate(startDate) : 'Awal'} s/d {endDate ? formatDate(endDate) : 'Sekarang'}
-        </p>
+      {/* ======================================================== */}
+      {/* PRINT-ONLY OFFICIAL DOCUMENT HEADER (KOP SURAT RESMI A4) */}
+      {/* ======================================================== */}
+      <div className="hidden print:block border-b-2 border-slate-900 pb-3 mb-4 report-avoid-break">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-300">
+          <div>
+            <h1 className="text-xl font-black uppercase tracking-wider text-slate-900 font-sans">
+              {settings.namaToko || 'POS USAHA TERPADU'}
+            </h1>
+            <p className="text-[11px] text-slate-600 font-sans mt-0.5">
+              {settings.alamat || 'Alamat Toko'} · Telp/WA: {settings.noTelepon || '-'}
+            </p>
+          </div>
+          <div className="text-right text-[10px] text-slate-600 font-mono">
+            <div>Waktu Cetak: {formatDateTime(new Date().toISOString())}</div>
+            <div>Operator/Kasir: {currentUser?.name || 'Kasir/Owner'}</div>
+          </div>
+        </div>
+
+        <div className="text-center pt-2.5">
+          <h2 className="text-sm font-black uppercase text-slate-900 tracking-wide font-sans">
+            LAPORAN REKAPITULASI KEUANGAN & LABA RUGI USAHA
+          </h2>
+          <div className="inline-block mt-0.5 px-3 py-0.5 rounded-md bg-slate-100 text-[11px] font-bold text-slate-800 font-mono border border-slate-300">
+            PERIODE LAPORAN: {startDate ? formatDate(startDate) : 'Awal'} s/d {endDate ? formatDate(endDate) : 'Sekarang'}
+          </div>
+        </div>
       </div>
 
       {/* 5 KPI MATRIX LABA RUGI (WARNA-WARNI SOFT PASTEL, TIDAK GELAP) */}
@@ -892,6 +949,28 @@ export const ReportView: React.FC = () => {
         </div>
       )}
 
+      {/* ======================================================== */}
+      {/* PRINT-ONLY SIGNATURE SECTION (LEMBAR PENGESAHAN A4)      */}
+      {/* ======================================================== */}
+      <div className="hidden print:block pt-8 mt-6 border-t border-slate-400 report-avoid-break">
+        <div className="flex justify-between items-start text-xs font-sans px-8">
+          <div className="text-center">
+            <div className="text-[11px] text-slate-600">Dibuat & Dicetak Oleh:</div>
+            <div className="mt-14 font-bold text-slate-900 underline">{currentUser?.name || 'Kasir / Petugas'}</div>
+            <div className="text-[10px] text-slate-500">Kasir / Operator POS</div>
+          </div>
+
+          <div className="text-center">
+            <div className="text-[11px] text-slate-600">
+              {settings.alamat?.split(',')[0] || 'Tempat'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </div>
+            <div className="text-[11px] text-slate-600">Mengetahui & Menyetujui,</div>
+            <div className="mt-14 font-bold text-slate-900 underline">Pemilik Usaha</div>
+            <div className="text-[10px] text-slate-500">Owner / Pimpinan Usaha</div>
+          </div>
+        </div>
+      </div>
+
       {/* Print Preview Modal */}
       {showPrintPreview && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -947,23 +1026,25 @@ export const ReportView: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                onClick={() => setShowPrintPreview(false)}
-                className="py-2 px-4 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700"
-              >
-                Batal
-              </button>
-              <button
-                onClick={() => {
-                  setShowPrintPreview(false);
-                  window.print();
-                }}
-                className="py-2 px-4 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-1.5"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Cetak Sekarang</span>
-              </button>
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                <span>📄 Format: <b>Kertas A4 (Browser Default)</b></span>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowPrintPreview(false)}
+                  className="py-2 px-4 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handlePrintA4}
+                  className="py-2 px-4 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-slate-800 flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak A4 (Browser Ctrl+P)</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

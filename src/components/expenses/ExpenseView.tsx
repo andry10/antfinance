@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { formatRupiah, formatDateTime, formatThousandInput, parseThousandInput } from '../../utils/format';
+import { formatRupiah, formatDateTime, formatThousandInput, parseThousandInput, getLocalDateStr } from '../../utils/format';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 import {
   ArrowDownCircle,
@@ -22,7 +22,7 @@ export const ExpenseView: React.FC = () => {
   const [kategori, setKategori] = useState<any>('operasional_lain');
   const [dateFilter, setDateFilter] = useState('');
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalDateStr();
 
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault();

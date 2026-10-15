@@ -271,26 +271,31 @@ export const PlayStationView: React.FC<PlayStationViewProps> = ({ onSuccessTrans
           let remainingMinutesDisplay = 0;
           let isTimeUp = false;
           let runningTimerStr = '00:00';
-
           if (activeSession) {
             const startTimeMs = new Date(activeSession.waktuMulai).getTime();
             const nowMs = Date.now();
-            const diffSecs = Math.max(0, Math.floor((nowMs - startTimeMs) / 1000));
+            let diffSecs = Math.max(0, Math.floor((nowMs - startTimeMs) / 1000));
+
+            if (activeSession.mode === 'paket_jam' && activeSession.waktuSelesaiRencana) {
+              const plannedEndMs = new Date(activeSession.waktuSelesaiRencana).getTime();
+              const remainMs = plannedEndMs - nowMs;
+              if (remainMs <= 0) {
+                isTimeUp = true;
+                // WAKTU BERHENTI: Waktu berhenti tepat di batas paket, tidak minus atau bertambah terus
+                const maxPackageSecs = Math.round((activeSession.durasiPaketJam || 1) * 3600);
+                diffSecs = maxPackageSecs;
+                remainingMinutesDisplay = 0;
+              } else {
+                remainingMinutesDisplay = Math.ceil(remainMs / (60 * 1000));
+              }
+            }
+
             const hrs = Math.floor(diffSecs / 3600);
             const mins = Math.floor((diffSecs % 3600) / 60);
             const secs = diffSecs % 60;
             runningTimerStr = hrs > 0
               ? `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
               : `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-
-            if (activeSession.mode === 'paket_jam' && activeSession.waktuSelesaiRencana) {
-              const remainMs = new Date(activeSession.waktuSelesaiRencana).getTime() - nowMs;
-              if (remainMs <= 0) {
-                isTimeUp = true;
-              } else {
-                remainingMinutesDisplay = Math.ceil(remainMs / (60 * 1000));
-              }
-            }
           }
 
           return (
@@ -298,7 +303,9 @@ export const PlayStationView: React.FC<PlayStationViewProps> = ({ onSuccessTrans
               key={unit.id}
               className={`rounded-2xl border p-4 transition-all shadow-sm flex flex-col justify-between ${
                 isPlaying
-                  ? 'border-indigo-400 dark:border-indigo-800 bg-indigo-50/40 dark:bg-indigo-950/25'
+                  ? isTimeUp && activeSession.statusBayar === 'belum_bayar'
+                    ? 'border-rose-500 bg-rose-50/70 dark:bg-rose-950/40 ring-2 ring-rose-400/80 animate-pulse'
+                    : 'border-indigo-400 dark:border-indigo-800 bg-indigo-50/40 dark:bg-indigo-950/25'
                   : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
               }`}
             >
@@ -309,10 +316,17 @@ export const PlayStationView: React.FC<PlayStationViewProps> = ({ onSuccessTrans
                     {unit.kodeUnit} · {unit.tipeKonsol}
                   </span>
                   {isPlaying ? (
-                    <span className="text-xs font-bold px-3 py-0.5 rounded-full bg-indigo-600 text-white flex items-center gap-1.5 animate-pulse shadow-xs">
-                      <Clock className="w-3 h-3" />
-                      <span>SEDANG MAIN</span>
-                    </span>
+                    isTimeUp && activeSession.statusBayar === 'belum_bayar' ? (
+                      <span className="text-xs font-bold px-3 py-0.5 rounded-full bg-rose-600 text-white flex items-center gap-1.5 shadow-sm animate-bounce">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-300" />
+                        <span>WAKTU HABIS!</span>
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold px-3 py-0.5 rounded-full bg-indigo-600 text-white flex items-center gap-1.5 animate-pulse shadow-xs">
+                        <Clock className="w-3 h-3" />
+                        <span>SEDANG MAIN</span>
+                      </span>
+                    )
                   ) : (
                     <span className="text-xs font-bold px-3 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                       TERSEDIA
@@ -342,8 +356,8 @@ export const PlayStationView: React.FC<PlayStationViewProps> = ({ onSuccessTrans
                       </div>
                       <div>
                         {activeSession.statusBayar === 'belum_bayar' ? (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300">
-                            BELUM BAYAR
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${isTimeUp ? 'bg-rose-600 text-white border-rose-700 animate-pulse' : 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border-amber-300'}`}>
+                            {isTimeUp ? '⚠️ HARAP DITAGIH' : 'BELUM BAYAR'}
                           </span>
                         ) : (
                           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300">
@@ -363,16 +377,22 @@ export const PlayStationView: React.FC<PlayStationViewProps> = ({ onSuccessTrans
 
                     {/* PROMINENT SISA WAKTU / DURASI BERJALAN BOX WITH SECONDS */}
                     {activeSession.mode === 'paket_jam' ? (
-                      <div className="p-3.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/60 border-2 border-indigo-200 dark:border-indigo-800 text-center shadow-xs">
-                        <div className="text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wide flex items-center justify-center gap-1.5">
-                          <Clock className="w-4 h-4 text-indigo-600 animate-pulse" />
-                          <span>Sisa Waktu:</span>
+                      <div className={`p-3.5 rounded-xl border-2 text-center shadow-xs ${
+                        isTimeUp
+                          ? 'bg-rose-100/90 dark:bg-rose-950/60 border-rose-400 dark:border-rose-700'
+                          : 'bg-indigo-50/90 dark:bg-indigo-950/60 border-indigo-200 dark:border-indigo-800'
+                      }`}>
+                        <div className={`text-xs font-bold uppercase tracking-wide flex items-center justify-center gap-1.5 ${
+                          isTimeUp ? 'text-rose-700 dark:text-rose-300' : 'text-indigo-700 dark:text-indigo-300'
+                        }`}>
+                          <Clock className={`w-4 h-4 ${isTimeUp ? 'text-rose-600 animate-bounce' : 'text-indigo-600 animate-pulse'}`} />
+                          <span>{isTimeUp ? 'WAKTU BERHENTI:' : 'Sisa Waktu:'}</span>
                         </div>
-                        <div className={`text-xl sm:text-2xl font-black font-mono mt-1 ${isTimeUp ? 'text-rose-600 animate-bounce' : 'text-indigo-950 dark:text-indigo-100'}`}>
-                          {isTimeUp ? 'Waktu Habis' : formatDurationMinutes(remainingMinutesDisplay)}
+                        <div className={`text-xl sm:text-2xl font-black font-mono mt-1 ${isTimeUp ? 'text-rose-600' : 'text-indigo-950 dark:text-indigo-100'}`}>
+                          {isTimeUp ? '00:00 (Habis)' : formatDurationMinutes(remainingMinutesDisplay)}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">
-                          Berjalan: {runningTimerStr}
+                        <div className={`text-xs mt-1 font-mono ${isTimeUp ? 'text-rose-700 font-bold' : 'text-slate-500 dark:text-slate-400'}`}>
+                          {isTimeUp ? `Waktu Berhenti di ${runningTimerStr}` : `Berjalan: ${runningTimerStr}`}
                         </div>
                       </div>
                     ) : (
@@ -469,11 +489,15 @@ export const PlayStationView: React.FC<PlayStationViewProps> = ({ onSuccessTrans
                     {/* SELESAI BUTTON */}
                     <button
                       onClick={() => handleDirectFinish(activeSession)}
-                      className="col-span-2 py-2.5 px-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                      className={`col-span-2 py-2.5 px-2 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer ${
+                        isTimeUp && activeSession.statusBayar === 'belum_bayar'
+                          ? 'bg-rose-600 hover:bg-rose-700 animate-pulse text-sm py-3 font-extrabold'
+                          : 'bg-indigo-600 hover:bg-indigo-700'
+                      }`}
                       title="Hentikan sesi rental dan simpan ke riwayat transaksi"
                     >
                       <CheckCircle className="w-4 h-4 shrink-0" />
-                      <span>Selesai & Catat Tagihan</span>
+                      <span>{isTimeUp && activeSession.statusBayar === 'belum_bayar' ? `💰 Terima Bayar & Selesaikan (${formatRupiah(activeSession.totalBiaya)})` : 'Selesai & Catat Tagihan'}</span>
                     </button>
                   </div>
                 ) : (

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { formatRupiah, formatDateTime } from '../../utils/format';
+import { formatRupiah, formatDateTime, getLocalDateStr } from '../../utils/format';
 import { Transaction } from '../../types';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 import {
@@ -15,7 +15,8 @@ import {
   Tag,
   Clock,
   User,
-  CreditCard
+  CreditCard,
+  RotateCcw
 } from 'lucide-react';
 
 interface TransactionViewProps {
@@ -27,11 +28,11 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
 
   const [txToDelete, setTxToDelete] = useState<Transaction | null>(null);
 
-  const getTodayStr = () => new Date().toISOString().split('T')[0];
+  const todayLocal = getLocalDateStr();
 
-  // Date Range Picker State (DEFAULT: today)
-  const [startDate, setStartDate] = useState<string>(getTodayStr());
-  const [endDate, setEndDate] = useState<string>(getTodayStr());
+  // Date Range Picker State (DEFAULT: today in device local time)
+  const [startDate, setStartDate] = useState<string>(todayLocal);
+  const [endDate, setEndDate] = useState<string>(todayLocal);
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -40,7 +41,7 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
 
   // Quick Preset Handlers
   const setPresetToday = () => {
-    const today = getTodayStr();
+    const today = getLocalDateStr();
     setStartDate(today);
     setEndDate(today);
   };
@@ -48,16 +49,16 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
   const setPresetYesterday = () => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    const yest = d.toISOString().split('T')[0];
+    const yest = getLocalDateStr(d);
     setStartDate(yest);
     setEndDate(yest);
   };
 
   const setPresetLast7Days = () => {
-    const today = getTodayStr();
+    const today = getLocalDateStr();
     const d = new Date();
     d.setDate(d.getDate() - 6);
-    const start = d.toISOString().split('T')[0];
+    const start = getLocalDateStr(d);
     setStartDate(start);
     setEndDate(today);
   };
@@ -67,7 +68,7 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const start = `${year}-${month}-01`;
-    const today = getTodayStr();
+    const today = getLocalDateStr();
     setStartDate(start);
     setEndDate(today);
   };
@@ -79,8 +80,8 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
 
   // Filtered transactions based on date range, query, and categories
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((tx) => {
-      // 1. Date range filter
+    const filtered = transactions.filter((tx) => {
+      // 1. Date range filter (dates formatted YYYY-MM-DD match cleanly)
       if (startDate && tx.tanggal < startDate) return false;
       if (endDate && tx.tanggal > endDate) return false;
 
@@ -107,6 +108,12 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
       }
 
       return true;
+    });
+
+    return [...filtered].sort((a, b) => {
+      const timeA = new Date(a.waktu).getTime() || 0;
+      const timeB = new Date(b.waktu).getTime() || 0;
+      return timeB - timeA;
     });
   }, [transactions, startDate, endDate, categoryFilter, statusFilter, searchQuery]);
 
@@ -169,7 +176,7 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
             <button
               onClick={setPresetToday}
               className={`px-3 py-1.5 text-xs md:text-sm rounded-xl font-semibold transition-colors ${
-                startDate === getTodayStr() && endDate === getTodayStr()
+                startDate === todayLocal && endDate === todayLocal
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}
@@ -274,6 +281,25 @@ export const TransactionView: React.FC<TransactionViewProps> = ({ onOpenReceipt 
           <span className="text-xs text-sky-700/80 dark:text-slate-400 font-medium">Omset dikurangi modal HPP</span>
         </div>
       </div>
+
+      {/* Filter Info / Reset Banner if some transactions are outside current filter */}
+      {transactions.length > filteredTransactions.length && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl text-xs text-amber-800 dark:text-amber-300">
+          <div className="flex items-center gap-1.5">
+            <Filter className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+            <span>
+              Menampilkan <strong>{filteredTransactions.length}</strong> dari total <strong>{transactions.length}</strong> transaksi ({transactions.length - filteredTransactions.length} transaksi berada di luar rentang filter).
+            </span>
+          </div>
+          <button
+            onClick={setPresetAll}
+            className="px-2.5 py-1 bg-amber-200/80 hover:bg-amber-300 dark:bg-amber-900/60 dark:hover:bg-amber-800 text-amber-900 dark:text-amber-100 font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span>Tampilkan Semua Transaksi</span>
+          </button>
+        </div>
+      )}
 
       {/* TRANSACTION LIST TABLE */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">

@@ -18,12 +18,15 @@ import {
   initAuth,
   googleSignIn,
   logoutGoogle,
-  getAccessToken
+  getAccessToken,
+  clearGoogleTokenOnly,
+  isGoogleTokenExpired
 } from '../services/firebase';
 import {
   createStoreSpreadsheet,
   syncAllToGoogleSheet,
-  pullAllFromGoogleSheet
+  pullAllFromGoogleSheet,
+  findExistingStoreSpreadsheet
 } from '../services/googleSheets';
 
 interface AppContextType {
@@ -114,7 +117,9 @@ interface AppContextType {
   updateSettings: (newSettings: Partial<StoreSettings>) => void;
   isSyncing: boolean;
   syncStatusMessage: string;
-  triggerGoogleSheetSync: (silent?: boolean, interactive?: boolean) => Promise<boolean>;
+  isGoogleTokenExpired: boolean;
+  refreshGoogleAuth: () => Promise<boolean>;
+  triggerGoogleSheetSync: (silent?: boolean, interactive?: boolean, overridePayload?: any) => Promise<boolean>;
   pullDataFromGoogleSheet: () => Promise<{ success: boolean; message: string }>;
   disconnectGoogle: () => Promise<void>;
   createNewGoogleSheet: () => Promise<string | null>;
@@ -231,23 +236,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return null;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER) || localStorage.getItem('pos_current_user');
+      if (saved && saved !== 'null' && saved !== 'undefined') {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.id || parsed.username)) {
+          return parsed;
+        }
       }
+    } catch (e) {
+      console.error('Error restoring persistent login:', e);
     }
-    // Default to owner for easy initial preview, but logout will clear it to null
-    return {
-      id: 'usr_owner',
-      username: 'owner',
-      name: 'Andry Gunawan (Owner)',
-      role: 'owner',
-      email: 'andrygunawan1000@gmail.com',
-      createdAt: new Date().toISOString()
-    };
+    // On first open on new device, return null so user is directed to LoginPage first
+    return null;
   });
 
   const [googleUser, setGoogleUser] = useState<any | null>(null);
@@ -669,6 +670,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Google Sheets sync state
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncStatusMessage, setSyncStatusMessage] = useState<string>('Siap sinkron');
+  const [isGoogleTokenExpiredState, setIsGoogleTokenExpiredState] = useState<boolean>(() => isGoogleTokenExpired());
 
   // Quick New Transaction Modal
   const [isNewTxModalOpen, setIsNewTxModalOpen] = useState<boolean>(false);
@@ -685,7 +687,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Sync state persistence to LocalStorage
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users)); }, [users]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser)); }, [currentUser]);
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      localStorage.removeItem('pos_current_user');
+    }
+  }, [currentUser]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions)); }, [transactions]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.DEBTS, JSON.stringify(debts)); }, [debts]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(expenses)); }, [expenses]);
@@ -703,14 +712,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     initAuth(
       (user, token) => {
         setGoogleUser(user);
-        setGoogleAccessToken(token);
+        if (token && !isGoogleTokenExpired()) {
+          setGoogleAccessToken(token);
+          setIsGoogleTokenExpiredState(false);
+        } else {
+          setGoogleAccessToken(null);
+          setIsGoogleTokenExpiredState(true);
+          setSyncStatusMessage('Sesi Google kedaluwarsa. Silakan klik tombol "Sambung Ulang Sheet".');
+        }
       },
       () => {
         setGoogleUser(null);
         setGoogleAccessToken(null);
+        setIsGoogleTokenExpiredState(false);
       }
     );
   }, []);
+
+  // Reference holding the freshest copy of all state data to prevent stale closure during Google Sheet sync
+  const stateDataRef = useRef({
+    transactions,
+    expenses,
+    debts,
+    ppobRanges,
+    ppobLains,
+    barangList,
+    bbmList,
+    activePsSessions,
+    settings,
+    googleAccessToken
+  });
+
+  useEffect(() => {
+    stateDataRef.current = {
+      transactions,
+      expenses,
+      debts,
+      ppobRanges,
+      ppobLains,
+      barangList,
+      bbmList,
+      activePsSessions,
+      settings,
+      googleAccessToken
+    };
+  });
 
   const finishPsSessionRef = useRef<any>(null);
 
@@ -794,8 +840,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       setGoogleUser(result.user);
       setGoogleAccessToken(result.accessToken);
+      setIsGoogleTokenExpiredState(false);
 
       const email = (result.user.email || '').toLowerCase().trim();
+
+      const afterGoogleLoginSync = async (accessToken: string) => {
+        try {
+          let sheetId = settings.spreadsheetId;
+          if (!sheetId) {
+            const found = await findExistingStoreSpreadsheet(accessToken);
+            if (found) {
+              sheetId = found.spreadsheetId;
+              updateSettings({
+                spreadsheetId: found.spreadsheetId,
+                spreadsheetUrl: found.spreadsheetUrl,
+                autoSyncSheets: true
+              });
+            }
+          }
+          if (sheetId) {
+            await pullDataFromGoogleSheet();
+          }
+        } catch (e) {
+          console.warn('Auto-sync after Google login:', e);
+        }
+      };
 
       // If user is already logged in as Owner, link this Google Account for Spreadsheet sync
       if (currentUser?.role === 'owner') {
@@ -805,6 +874,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentUser(updatedUser);
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
         setSyncStatusMessage(`Terhubung ke Google (${email}). Auto-sync Google Sheet aktif.`);
+        afterGoogleLoginSync(result.accessToken);
         return { success: true };
       }
 
@@ -823,6 +893,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setCurrentUser(updatedOwner);
           localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedOwner));
           setSyncStatusMessage(`Terhubung ke Google (${email}). Masuk sebagai Owner.`);
+          afterGoogleLoginSync(result.accessToken);
           return { success: true };
         }
 
@@ -850,6 +921,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentUser(registeredUser);
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(registeredUser));
       setSyncStatusMessage(`Terhubung ke Google (${email})`);
+      afterGoogleLoginSync(result.accessToken);
       return { success: true };
     } catch (err: any) {
       console.error('Login Google failed:', err);
@@ -861,7 +933,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await logoutGoogle();
     setGoogleUser(null);
     setGoogleAccessToken(null);
+    setIsGoogleTokenExpiredState(false);
     setSyncStatusMessage('Koneksi Google Sheet diputuskan.');
+  };
+
+  const refreshGoogleAuth = async (): Promise<boolean> => {
+    try {
+      setSyncStatusMessage('Menyambungkan ulang Akun Google...');
+      const res = await loginGoogle();
+      if (res.success) {
+        setIsGoogleTokenExpiredState(false);
+        await triggerGoogleSheetSync(false, false);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
   };
 
   const logout = () => {
@@ -870,6 +958,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setGoogleAccessToken(null);
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    localStorage.removeItem('pos_current_user');
   };
 
   const addUser = (userData: Omit<UserAccount, 'id' | 'createdAt'>) => {
@@ -933,7 +1022,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       tanggal: dateStr
     };
 
-    setTransactions((prev) => [newTx, ...prev]);
+    const updatedTransactions = [newTx, ...transactions];
+    setTransactions(updatedTransactions);
 
     // Update Stock for Goods
     newTx.items.forEach((item) => {
@@ -960,6 +1050,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         );
       }
     });
+
+    let updatedDebtsList = debts;
 
     // If payment status is Hutang or Sebagian, automatically create a Debt record
     if (newTx.statusPembayaran === 'hutang' || newTx.statusPembayaran === 'sebagian') {
@@ -997,29 +1089,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         riwayatPembayaran: initialPayments,
         catatan: newTx.catatan || (isSebagian ? 'Bayar Sebagian Transaksi Baru' : 'Hutang Transaksi Baru')
       };
-      setDebts((prev) => [newDebt, ...prev]);
+      updatedDebtsList = [newDebt, ...debts];
+      setDebts(updatedDebtsList);
     }
+
+    // Immediately trigger auto-sync to Google Sheet so other devices and spreadsheet update without waiting
+    triggerGoogleSheetSync(true, false, {
+      transaksi: updatedTransactions,
+      hutang: updatedDebtsList
+    }).catch(() => {});
 
     return newTx;
   };
 
   const deleteTransaction = (id: string) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
-    setDebts((prev) => prev.filter((d) => d.transaksiId !== id));
+    const updatedTx = transactions.filter((t) => t.id !== id);
+    const updatedDebts = debts.filter((d) => d.transaksiId !== id);
+    setTransactions(updatedTx);
+    setDebts(updatedDebts);
+    triggerGoogleSheetSync(true, false, {
+      transaksi: updatedTx,
+      hutang: updatedDebts
+    }).catch(() => {});
   };
 
   const deleteDebt = (id: string) => {
-    setDebts((prev) => prev.filter((d) => d.id !== id));
+    const updatedDebts = debts.filter((d) => d.id !== id);
+    setDebts(updatedDebts);
+    triggerGoogleSheetSync(true, false, { hutang: updatedDebts }).catch(() => {});
   };
 
   // Pay Debt Function
   const payDebt = (debtId: string, nominal: number, metode: any, catatan?: string) => {
-    setDebts((prevDebts) =>
-      prevDebts.map((d) => {
+    let updatedDebtsList: DebtRecord[] = [];
+    setDebts((prevDebts) => {
+      const updated = prevDebts.map((d) => {
         if (d.id !== debtId) return d;
         const newPaid = d.totalDibayar + nominal;
         const newRemaining = Math.max(0, d.totalHutang - newPaid);
-        const newStatus = newRemaining === 0 ? 'lunas' : 'sebagian';
+        const newStatus: 'lunas' | 'sebagian' = newRemaining === 0 ? 'lunas' : 'sebagian';
 
         const paymentItem = {
           id: generateUniqueId('pay'),
@@ -1037,8 +1145,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           status: newStatus,
           riwayatPembayaran: [paymentItem, ...d.riwayatPembayaran]
         };
-      })
-    );
+      });
+      updatedDebtsList = updated;
+      return updated;
+    });
+    triggerGoogleSheetSync(true, false, { hutang: updatedDebtsList }).catch(() => {});
   };
 
   // Expenses Functions
@@ -1052,11 +1163,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       kasirName: currentUser?.name || 'Kasir',
       kasirId: currentUser?.id || 'usr_unknown'
     };
-    setExpenses((prev) => [newExp, ...prev]);
+    const updatedExpenses = [newExp, ...expenses];
+    setExpenses(updatedExpenses);
+    triggerGoogleSheetSync(true, false, { pengeluaran: updatedExpenses }).catch(() => {});
   };
 
   const deleteExpense = (id: string) => {
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
+    const updatedExpenses = expenses.filter((e) => e.id !== id);
+    setExpenses(updatedExpenses);
+    triggerGoogleSheetSync(true, false, { pengeluaran: updatedExpenses }).catch(() => {});
   };
 
   // Masters
@@ -1419,50 +1534,74 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const triggerGoogleSheetSync = async (
     silent: boolean = false,
-    interactive: boolean = false
+    interactive: boolean = false,
+    overridePayload?: {
+      transaksi?: Transaction[];
+      pengeluaran?: ExpenseRecord[];
+      hutang?: DebtRecord[];
+      ppobRange?: MasterPPOBRange[];
+      ppobLain?: MasterPPOBLain[];
+      barang?: MasterBarang[];
+      bbm?: MasterBBM[];
+      rentalPS?: PSRentalSession[];
+    }
   ): Promise<boolean> => {
-    let token = googleAccessToken;
-    if (!token) {
+    let token = googleAccessToken || stateDataRef.current.googleAccessToken;
+    if (!token || isGoogleTokenExpired()) {
       token = await getAccessToken();
     }
 
-    if (!token && interactive) {
+    if ((!token || isGoogleTokenExpiredState) && interactive) {
+      setSyncStatusMessage('Memperbarui otorisasi Akun Google...');
       const loginRes = await loginGoogle();
       if (loginRes.success) {
         token = await getAccessToken();
+        setIsGoogleTokenExpiredState(false);
       }
     }
 
     if (!token) {
       if (!silent) {
-        setSyncStatusMessage('Belum terhubung ke Akun Google. Silakan klik "Hubungkan Akun Google".');
+        setSyncStatusMessage('Sesi Google kedaluwarsa. Silakan klik tombol "Sambung Ulang Sheet".');
       }
       return false;
     }
 
-    let sheetId = settings.spreadsheetId;
+    let sheetId = settings.spreadsheetId || stateDataRef.current.settings.spreadsheetId;
     if (!sheetId) {
-      // Auto-create spreadsheet if not set yet
+      // Check if an existing POS spreadsheet already exists in Google Drive
       try {
         setIsSyncing(true);
-        setSyncStatusMessage('Membuat Google Spreadsheet baru di Drive...');
-        const created = await createStoreSpreadsheet(
-          token,
-          `POS_${settings.namaToko.replace(/\s+/g, '_')}`
-        );
-        sheetId = created.spreadsheetId;
-        updateSettings({
-          spreadsheetId: sheetId,
-          spreadsheetUrl: created.spreadsheetUrl,
-          autoSyncSheets: true
-        });
+        setSyncStatusMessage('Memeriksa Google Spreadsheet di Drive...');
+        const existing = await findExistingStoreSpreadsheet(token);
+        if (existing) {
+          sheetId = existing.spreadsheetId;
+          updateSettings({
+            spreadsheetId: existing.spreadsheetId,
+            spreadsheetUrl: existing.spreadsheetUrl,
+            autoSyncSheets: true
+          });
+        } else {
+          setSyncStatusMessage('Membuat Google Spreadsheet baru di Drive...');
+          const created = await createStoreSpreadsheet(
+            token,
+            `POS_${settings.namaToko.replace(/\s+/g, '_')}`
+          );
+          sheetId = created.spreadsheetId;
+          updateSettings({
+            spreadsheetId: sheetId,
+            spreadsheetUrl: created.spreadsheetUrl,
+            autoSyncSheets: true
+          });
+        }
       } catch (err: any) {
         setIsSyncing(false);
         if (err?.message?.includes('AUTH_EXPIRED') || err?.message?.includes('401')) {
           setGoogleAccessToken(null);
-          await logoutGoogle();
+          clearGoogleTokenOnly();
+          setIsGoogleTokenExpiredState(true);
         }
-        if (!silent) setSyncStatusMessage(`Gagal membuat spreadsheet: ${err.message}`);
+        if (!silent) setSyncStatusMessage(`Gagal menyiapkan spreadsheet: ${err.message}`);
         return false;
       }
     }
@@ -1470,21 +1609,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsSyncing(true);
     setSyncStatusMessage(silent ? 'Menyinkronkan otomatis ke Google Sheet...' : 'Sedang menyinkronkan data ke Google Sheet...');
 
+    const cur = stateDataRef.current;
+    const finalTransaksi = overridePayload?.transaksi || cur.transactions;
+    const finalPengeluaran = overridePayload?.pengeluaran || cur.expenses;
+    const finalHutang = overridePayload?.hutang || cur.debts;
+    const finalPpobRange = overridePayload?.ppobRange || cur.ppobRanges;
+    const finalPpobLain = overridePayload?.ppobLain || cur.ppobLains;
+    const finalBarang = overridePayload?.barang || cur.barangList;
+    const finalBbm = overridePayload?.bbm || cur.bbmList;
+    const finalRentalPS = overridePayload?.rentalPS || cur.activePsSessions;
+
     const result = await syncAllToGoogleSheet(token, sheetId, {
-      transaksi: transactions,
-      pengeluaran: expenses,
-      hutang: debts,
-      ppobRange: ppobRanges,
-      ppobLain: ppobLains,
-      barang: barangList,
-      bbm: bbmList,
-      rentalPS: activePsSessions
+      transaksi: finalTransaksi,
+      pengeluaran: finalPengeluaran,
+      hutang: finalHutang,
+      ppobRange: finalPpobRange,
+      ppobLain: finalPpobLain,
+      barang: finalBarang,
+      bbm: finalBbm,
+      rentalPS: finalRentalPS
     });
 
     setIsSyncing(false);
     if (result.success) {
       const nowTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       setSyncStatusMessage(`Otomatis tersinkron pukul ${nowTime}`);
+      setIsGoogleTokenExpiredState(false);
       updateSettings({
         lastSyncedAt: new Date().toISOString(),
         spreadsheetUrl: result.spreadsheetUrl || settings.spreadsheetUrl
@@ -1493,8 +1643,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       if (result.isTokenExpired) {
         setGoogleAccessToken(null);
-        await logoutGoogle();
-        setSyncStatusMessage('Sesi Google kedaluwarsa. Silakan hubungkan ulang akun Google.');
+        clearGoogleTokenOnly();
+        setIsGoogleTokenExpiredState(true);
+
+        // If triggered by a user click (interactive), try re-authenticating and retrying immediately!
+        if (interactive) {
+          setSyncStatusMessage('Menyambungkan ulang sesi Google...');
+          const loginRes = await loginGoogle();
+          if (loginRes.success) {
+            const freshToken = await getAccessToken();
+            if (freshToken) {
+              setGoogleAccessToken(freshToken);
+              setIsGoogleTokenExpiredState(false);
+              const retryRes = await syncAllToGoogleSheet(freshToken, sheetId, {
+                transaksi: finalTransaksi,
+                pengeluaran: finalPengeluaran,
+                hutang: finalHutang,
+                ppobRange: finalPpobRange,
+                ppobLain: finalPpobLain,
+                barang: finalBarang,
+                bbm: finalBbm,
+                rentalPS: finalRentalPS
+              });
+              if (retryRes.success) {
+                const nowTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                setSyncStatusMessage(`Otomatis tersinkron pukul ${nowTime}`);
+                updateSettings({
+                  lastSyncedAt: new Date().toISOString(),
+                  spreadsheetUrl: retryRes.spreadsheetUrl || settings.spreadsheetUrl
+                });
+                return true;
+              }
+            }
+          }
+        }
+
+        setSyncStatusMessage('Sesi Google kedaluwarsa. Silakan klik tombol "Sambung Ulang Sheet".');
       } else if (!silent) {
         setSyncStatusMessage(`Sinkron gagal: ${result.message}`);
       }
@@ -1540,7 +1724,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const pullDataFromGoogleSheet = async (): Promise<{ success: boolean; message: string }> => {
-    let token = googleAccessToken;
+    let token = googleAccessToken || stateDataRef.current.googleAccessToken;
     if (!token) {
       token = await getAccessToken();
     }
@@ -1554,7 +1738,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: 'Harap hubungkan Akun Google terlebih dahulu.' };
     }
 
-    const sheetId = settings.spreadsheetId;
+    let sheetId = settings.spreadsheetId;
+    if (!sheetId) {
+      // Auto-discover if available in Drive
+      const found = await findExistingStoreSpreadsheet(token);
+      if (found) {
+        sheetId = found.spreadsheetId;
+        updateSettings({
+          spreadsheetId: found.spreadsheetId,
+          spreadsheetUrl: found.spreadsheetUrl,
+          autoSyncSheets: true
+        });
+      }
+    }
+
     if (!sheetId) {
       return { success: false, message: 'Belum ada Spreadsheet yang ditautkan.' };
     }
@@ -1573,13 +1770,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (res.data.ppobRange.length > 0) setPpobRanges(res.data.ppobRange);
         if (res.data.ppobLain.length > 0) setPpobLains(res.data.ppobLain);
 
-        const nowTime = new Date().toLocaleTimeString('id-ID');
-        setSyncStatusMessage(`Database berhasil dimuat dari Spreadsheet pukul ${nowTime}!`);
+        const nowTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        setSyncStatusMessage(`Database otomatis tersinkron dari Spreadsheet pukul ${nowTime}!`);
         return { success: true, message: res.message };
       } else {
         if (res.isTokenExpired) {
           setGoogleAccessToken(null);
-          await logoutGoogle();
+          clearGoogleTokenOnly();
+          setIsGoogleTokenExpiredState(true);
         }
         setSyncStatusMessage(`Gagal memuat: ${res.message}`);
         return { success: false, message: res.message };
@@ -1591,6 +1789,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Automatic pull & sync on startup ("saat buka awal") so multiple devices always have identical data
+  const hasPulledOnStartup = useRef(false);
+  useEffect(() => {
+    if (hasPulledOnStartup.current) return;
+    const token = googleAccessToken || (typeof window !== 'undefined' ? localStorage.getItem('pos_google_access_token') : null);
+    if (!token || isGoogleTokenExpired()) return;
+
+    hasPulledOnStartup.current = true;
+    const runStartupSync = async () => {
+      let sheetId = settings.spreadsheetId;
+      if (!sheetId) {
+        const found = await findExistingStoreSpreadsheet(token);
+        if (found) {
+          sheetId = found.spreadsheetId;
+          updateSettings({
+            spreadsheetId: found.spreadsheetId,
+            spreadsheetUrl: found.spreadsheetUrl,
+            autoSyncSheets: true
+          });
+        }
+      }
+      if (sheetId) {
+        setSyncStatusMessage('Memuat data terbaru dari Google Spreadsheet...');
+        const res = await pullAllFromGoogleSheet(token, sheetId);
+        if (res.success && res.data) {
+          if (res.data.transaksi && res.data.transaksi.length > 0) setTransactions(res.data.transaksi);
+          if (res.data.pengeluaran && res.data.pengeluaran.length > 0) setExpenses(res.data.pengeluaran);
+          if (res.data.hutang && res.data.hutang.length > 0) setDebts(res.data.hutang);
+          if (res.data.barang && res.data.barang.length > 0) setBarangList(res.data.barang);
+          if (res.data.bbm && res.data.bbm.length > 0) setBbmList(res.data.bbm);
+          if (res.data.ppobRange && res.data.ppobRange.length > 0) setPpobRanges(res.data.ppobRange);
+          if (res.data.ppobLain && res.data.ppobLain.length > 0) setPpobLains(res.data.ppobLain);
+          const nowTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+          setSyncStatusMessage(`Database otomatis tersinkron dari Sheet pukul ${nowTime}`);
+        }
+      }
+    };
+    runStartupSync().catch(() => {});
+  }, [googleAccessToken, settings.spreadsheetId]);
+
   // Background debounced auto-sync to Google Sheet whenever any store data changes
   const isInitialSyncMount = useRef(true);
   useEffect(() => {
@@ -1599,15 +1837,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    // Auto sync requires active token and autoSyncSheets enabled
+    // Auto sync requires active token, not expired, and autoSyncSheets enabled
     const token = googleAccessToken || (typeof window !== 'undefined' ? localStorage.getItem('pos_google_access_token') : null);
-    if (!token || settings.autoSyncSheets === false) return;
+    if (!token || isGoogleTokenExpired() || isGoogleTokenExpiredState || settings.autoSyncSheets === false) return;
 
     const timer = setTimeout(() => {
       triggerGoogleSheetSync(true).catch((e) => {
         console.warn('Auto-sync background check:', e);
       });
-    }, 2000);
+    }, 400);
 
     return () => clearTimeout(timer);
   }, [
@@ -1621,7 +1859,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     activePsSessions,
     googleAccessToken,
     settings.autoSyncSheets,
-    settings.spreadsheetId
   ]);
 
   return (
@@ -1698,6 +1935,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateSettings,
         isSyncing,
         syncStatusMessage,
+        isGoogleTokenExpired: isGoogleTokenExpiredState,
+        refreshGoogleAuth,
         triggerGoogleSheetSync,
         createNewGoogleSheet,
         pullDataFromGoogleSheet,

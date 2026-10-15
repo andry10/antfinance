@@ -14,9 +14,19 @@ import {
   DownloadCloud,
   Link2,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Printer,
+  Bluetooth,
+  BluetoothConnected
 } from 'lucide-react';
 import { UserAccount } from '../../types';
+import {
+  isBluetoothSupported,
+  getConnectedPrinterName,
+  connectBluetoothPrinter,
+  disconnectBluetoothPrinter,
+  testPrintBluetooth
+} from '../../services/bluetoothPrinter';
 
 interface ProfileViewProps {
   onOpenAuthModal: () => void;
@@ -40,7 +50,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenAuthModal }) => 
     syncStatusMessage,
     triggerGoogleSheetSync,
     createNewGoogleSheet,
-    logout
+    logout,
+    isGoogleTokenExpired
   } = useApp();
 
   const isOwner = currentUser?.role === 'owner';
@@ -86,6 +97,50 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenAuthModal }) => 
   const [editUsername, setEditUsername] = useState(currentUser?.username || '');
   const [editPassword, setEditPassword] = useState('');
   const [isSavedProfile, setIsSavedProfile] = useState(false);
+
+  // Bluetooth Thermal Printer state
+  const [btPrinterName, setBtPrinterName] = useState<string | null>(getConnectedPrinterName());
+  const [isBtConnecting, setIsBtConnecting] = useState(false);
+  const [isBtTesting, setIsBtTesting] = useState(false);
+  const [btNotice, setBtNotice] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const handleConnectBt = async () => {
+    setIsBtConnecting(true);
+    setBtNotice({ text: 'Membuka dialog Bluetooth...', type: 'info' });
+    try {
+      const res = await connectBluetoothPrinter();
+      if (res.success && res.deviceName) {
+        setBtPrinterName(res.deviceName);
+        setBtNotice({ text: `Terhubung ke ${res.deviceName}!`, type: 'success' });
+      } else {
+        setBtNotice({ text: res.error || 'Batal menyambungkan.', type: 'error' });
+      }
+    } finally {
+      setIsBtConnecting(false);
+    }
+  };
+
+  const handleTestPrintBt = async () => {
+    setIsBtTesting(true);
+    setBtNotice({ text: 'Mengirim teks uji cetak...', type: 'info' });
+    try {
+      const res = await testPrintBluetooth(settings);
+      if (res.success) {
+        setBtNotice({ text: 'Uji cetak berhasil ke printer 58mm!', type: 'success' });
+      } else {
+        setBtNotice({ text: res.error || 'Gagal uji cetak.', type: 'error' });
+      }
+    } finally {
+      setIsBtTesting(false);
+    }
+  };
+
+  const handleDisconnectBt = async () => {
+    await disconnectBluetoothPrinter();
+    setBtPrinterName(null);
+    setBtNotice({ text: 'Printer Bluetooth telah diputus.', type: 'info' });
+    setTimeout(() => setBtNotice(null), 3000);
+  };
 
   // Add User Form (Owner only)
   const [newUsername, setNewUsername] = useState('');
@@ -342,6 +397,28 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenAuthModal }) => 
               </div>
             )}
 
+            {/* Sesi Google Kedaluwarsa Banner */}
+            {isGoogleTokenExpired && googleUser && (
+              <div className="p-3.5 bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 rounded-xl space-y-2.5 animate-in fade-in">
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-200">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Sesi Izin Google Telah Kedaluwarsa</span>
+                </div>
+                <p className="text-[11px] text-amber-800/90 dark:text-amber-300/80 leading-relaxed">
+                  Token izin Google memiliki batas masa aktif 1 jam dari Google. Klik tombol di bawah untuk menyambungkan kembali tanpa perlu keluar dari akun aplikasi.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => triggerGoogleSheetSync(false, true)}
+                  disabled={isSyncing}
+                  className="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>Sambungkan Ulang Izin & Sinkronkan Sekarang</span>
+                </button>
+              </div>
+            )}
+
             {/* Spreadsheet Link Status */}
             {settings.spreadsheetUrl && (
               <div className="p-3 bg-white dark:bg-slate-800 border border-sky-100 dark:border-slate-700 rounded-xl space-y-1.5 text-xs">
@@ -521,6 +598,108 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenAuthModal }) => 
                     <span>{isSavedStore ? 'Tersimpan!' : 'Simpan Pengaturan Toko'}</span>
                   </button>
                 </form>
+              </div>
+
+              {/* Card Printer Bluetooth Thermal 58mm */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                    <Bluetooth className="w-4 h-4 text-sky-600" />
+                    <span>Printer Kasir Bluetooth 58mm</span>
+                  </h2>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                    ESC/POS 58mm
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Cetak struk penjualan otomatis menggunakan printer thermal Bluetooth 58mm (Panda, Iware, RPP02N, POS-58, GOOJPRT, dll.).
+                </p>
+
+                {/* Status indicator */}
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {btPrinterName ? (
+                      <>
+                        <BluetoothConnected className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <div>
+                          <div className="text-xs font-bold text-emerald-700 dark:text-emerald-400 truncate">
+                            {btPrinterName}
+                          </div>
+                          <div className="text-[10px] text-slate-400">Terhubung & Siap Cetak</div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Bluetooth className="w-4 h-4 text-slate-400 shrink-0" />
+                        <div>
+                          <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            Belum Terhubung
+                          </div>
+                          <div className="text-[10px] text-slate-400">Klik tombol untuk pasangkan</div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {btPrinterName && (
+                    <button
+                      type="button"
+                      onClick={handleDisconnectBt}
+                      className="text-[11px] px-2 py-1 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 font-medium"
+                    >
+                      Putus
+                    </button>
+                  )}
+                </div>
+
+                {btNotice && (
+                  <div
+                    className={`p-2.5 rounded-xl text-xs flex items-center gap-1.5 ${
+                      btNotice.type === 'success'
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        : btNotice.type === 'error'
+                        ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                        : 'bg-sky-50 text-sky-800 border border-sky-200'
+                    }`}
+                  >
+                    {btNotice.type === 'success' ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    ) : btNotice.type === 'error' ? (
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    ) : (
+                      <RefreshCw className="w-3.5 h-3.5 text-sky-600 animate-spin shrink-0" />
+                    )}
+                    <span className="text-[11px] font-medium">{btNotice.text}</span>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleConnectBt}
+                    disabled={isBtConnecting || !isBluetoothSupported()}
+                    className="flex-1 py-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <Bluetooth className="w-3.5 h-3.5" />
+                    <span>{isBtConnecting ? 'Mencari...' : btPrinterName ? 'Ganti Printer' : 'Sambungkan Bluetooth'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleTestPrintBt}
+                    disabled={isBtTesting}
+                    className="py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-xs flex items-center gap-1"
+                    title="Cetak struk percobaan ke printer 58mm"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{isBtTesting ? 'Menguji...' : 'Uji Cetak'}</span>
+                  </button>
+                </div>
+
+                <div className="text-[10px] text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-2 rounded-lg leading-relaxed">
+                  📌 <b>Catatan Cetak:</b> Struk transaksi dicetak ke Bluetooth thermal 58mm. Sedangkan rekapitulasi laporan keuangan dicetak menggunakan kertas <b>A4 default browser</b>.
+                </div>
               </div>
             </div>
 

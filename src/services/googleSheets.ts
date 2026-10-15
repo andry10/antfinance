@@ -155,11 +155,11 @@ export async function ensureSheetTabsAndHeaders(accessToken: string, spreadsheet
   // 3. Write / update standard headers
   const headerData = [
     {
-      range: 'TRANSAKSI!A1:L1',
+      range: 'TRANSAKSI!A1:M1',
       values: [[
         'ID Transaksi', 'No Struk', 'Waktu', 'Tanggal', 'Kategori',
         'Rincian Item', 'Total Modal', 'Total Jual', 'Total Laba',
-        'Metode Bayar', 'Status Bayar', 'Kasir'
+        'Metode Bayar', 'Status Bayar', 'Kasir', 'Data Detail'
       ]]
     },
     {
@@ -170,11 +170,11 @@ export async function ensureSheetTabsAndHeaders(accessToken: string, spreadsheet
       ]]
     },
     {
-      range: 'HUTANG_PELANGGAN!A1:J1',
+      range: 'HUTANG_PELANGGAN!A1:K1',
       values: [[
         'ID Hutang', 'No Struk', 'Nama Pelanggan', 'No HP',
         'Tgl Transaksi', 'Jatuh Tempo', 'Total Hutang',
-        'Total Dibayar', 'Sisa Hutang', 'Status'
+        'Total Dibayar', 'Sisa Hutang', 'Status', 'Riwayat Pembayaran'
       ]]
     },
     {
@@ -235,6 +235,17 @@ export async function ensureSheetTabsAndHeaders(accessToken: string, spreadsheet
  */
 export const initializeSheetHeaders = ensureSheetTabsAndHeaders;
 
+// In-memory cache of verified spreadsheets to prevent redundant API calls on every rapid sync
+const verifiedSpreadsheets = new Set<string>();
+
+export function markSpreadsheetUnverified(spreadsheetId?: string) {
+  if (spreadsheetId) {
+    verifiedSpreadsheets.delete(spreadsheetId);
+  } else {
+    verifiedSpreadsheets.clear();
+  }
+}
+
 /**
  * Sync entire application database to Google Sheet
  */
@@ -253,8 +264,11 @@ export async function syncAllToGoogleSheet(
   }
 ): Promise<SyncResult> {
   try {
-    // 1. Ensure tabs & headers exist
-    await ensureSheetTabsAndHeaders(accessToken, spreadsheetId);
+    // 1. Ensure tabs & headers exist once per spreadsheet session
+    if (!verifiedSpreadsheets.has(spreadsheetId)) {
+      await ensureSheetTabsAndHeaders(accessToken, spreadsheetId);
+      verifiedSpreadsheets.add(spreadsheetId);
+    }
 
     // 2. Map Transaksi
     const transaksiRows = payload.transaksi.map((t) => [
@@ -269,7 +283,16 @@ export async function syncAllToGoogleSheet(
       t.totalLaba || 0,
       t.metodePembayaran || 'Tunai',
       t.statusPembayaran || 'lunas',
-      t.kasirName || ''
+      t.kasirName || '',
+      JSON.stringify({
+        items: t.items,
+        namaPelanggan: t.namaPelanggan,
+        noHpPelanggan: t.noHpPelanggan,
+        catatan: t.catatan,
+        jumlahBayar: t.jumlahBayar,
+        sisaHutang: t.sisaHutang,
+        kasirId: t.kasirId
+      })
     ]);
 
     // 3. Map Pengeluaran
@@ -294,7 +317,8 @@ export async function syncAllToGoogleSheet(
       h.totalHutang || 0,
       h.totalDibayar || 0,
       h.sisaHutang || 0,
-      h.status || 'belum_lunas'
+      h.status || 'belum_lunas',
+      JSON.stringify(h.riwayatPembayaran || [])
     ]);
 
     // 5. Map PPOB Range
@@ -368,9 +392,9 @@ export async function syncAllToGoogleSheet(
       },
       body: JSON.stringify({
         ranges: [
-          'TRANSAKSI!A2:L',
+          'TRANSAKSI!A2:M',
           'PENGELUARAN!A2:G',
-          'HUTANG_PELANGGAN!A2:J',
+          'HUTANG_PELANGGAN!A2:K',
           'MASTER_PPOB_RANGE!A2:E',
           'MASTER_PPOB_LAIN!A2:E',
           'MASTER_BARANG!A2:G',
@@ -384,16 +408,16 @@ export async function syncAllToGoogleSheet(
     // Overwrite content starting from row 2 (preserve row 1 header)
     const batchData = [
       {
-        range: `TRANSAKSI!A2:L${Math.max(2, transaksiRows.length + 1)}`,
-        values: transaksiRows.length > 0 ? transaksiRows : [['', '', '', '', '', '', '', '', '', '', '', '']]
+        range: `TRANSAKSI!A2:M${Math.max(2, transaksiRows.length + 1)}`,
+        values: transaksiRows.length > 0 ? transaksiRows : [['', '', '', '', '', '', '', '', '', '', '', '', '']]
       },
       {
         range: `PENGELUARAN!A2:G${Math.max(2, pengeluaranRows.length + 1)}`,
         values: pengeluaranRows.length > 0 ? pengeluaranRows : [['', '', '', '', '', '', '']]
       },
       {
-        range: `HUTANG_PELANGGAN!A2:J${Math.max(2, hutangRows.length + 1)}`,
-        values: hutangRows.length > 0 ? hutangRows : [['', '', '', '', '', '', '', '', '', '']]
+        range: `HUTANG_PELANGGAN!A2:K${Math.max(2, hutangRows.length + 1)}`,
+        values: hutangRows.length > 0 ? hutangRows : [['', '', '', '', '', '', '', '', '', '', '']]
       },
       {
         range: `MASTER_PPOB_RANGE!A2:E${Math.max(2, ppobRangeRows.length + 1)}`,
@@ -452,12 +476,18 @@ export async function syncAllToGoogleSheet(
       message: 'Berhasil sinkronisasi seluruh data ke Google Spreadsheet!'
     };
   } catch (error: any) {
-    console.error('Error syncing to Google Sheet:', error);
     const isAuth = error?.message?.includes('AUTH_EXPIRED') || error?.message?.includes('401');
+    if (isAuth) {
+      console.warn('Google Sheets token expired, awaiting user reconnect.');
+    } else {
+      console.error('Error syncing to Google Sheet:', error);
+    }
     return {
       success: false,
       isTokenExpired: isAuth,
-      message: error?.message || 'Terjadi kesalahan saat menyinkronkan data ke Google Sheet.'
+      message: isAuth
+        ? 'Sesi Google Anda telah berakhir. Silakan klik tombol "Sambung Ulang Sheet".'
+        : (error?.message || 'Terjadi kesalahan saat menyinkronkan data ke Google Sheet.')
     };
   }
 }
@@ -471,9 +501,9 @@ export async function pullAllFromGoogleSheet(
 ): Promise<PullResult> {
   try {
     const ranges = [
-      'TRANSAKSI!A2:L',
+      'TRANSAKSI!A2:M',
       'PENGELUARAN!A2:G',
-      'HUTANG_PELANGGAN!A2:J',
+      'HUTANG_PELANGGAN!A2:K',
       'MASTER_PPOB_RANGE!A2:E',
       'MASTER_PPOB_LAIN!A2:E',
       'MASTER_BARANG!A2:G',
@@ -512,39 +542,53 @@ export async function pullAllFromGoogleSheet(
 
     // 1. TRANSAKSI
     const txRows = getRows(0);
-    const transaksi: Transaction[] = txRows.map((r) => ({
-      id: String(r[0] || `tx_${Date.now()}`),
-      nomorStruk: String(r[1] || ''),
-      waktu: String(r[2] || new Date().toISOString()),
-      tanggal: String(r[3] || new Date().toISOString().split('T')[0]),
-      kategoriUtama: (r[4] as any) || 'barang',
-      items: [
-        {
-          id: `it_${String(r[0] || '1')}`,
-          nama: String(r[5] || 'Transaksi'),
-          kategori: (r[4] as any) || 'barang',
-          qty: 1,
-          hargaModal: Number(r[6]) || 0,
-          hargaJual: Number(r[7]) || 0,
-          subtotal: Number(r[7]) || 0,
-          laba: (Number(r[7]) || 0) - (Number(r[6]) || 0)
-        }
-      ],
-      totalModal: Number(r[6]) || 0,
-      totalJual: Number(r[7]) || 0,
-      totalLaba: Number(r[8]) || (Number(r[7]) || 0) - (Number(r[6]) || 0),
-      metodePembayaran: (r[9] as any) || 'tunai',
-      statusPembayaran: (r[10] as any) || 'lunas',
-      kasirName: String(r[11] || 'Kasir'),
-      kasirId: 'usr_owner'
-    }));
+    const transaksi: Transaction[] = txRows.map((r) => {
+      let extra: any = {};
+      if (r[12]) {
+        try {
+          extra = JSON.parse(r[12]);
+        } catch (e) {}
+      }
+
+      return {
+        id: String(r[0] || `tx_${Date.now()}`),
+        nomorStruk: String(r[1] || ''),
+        waktu: String(r[2] || new Date().toISOString()),
+        tanggal: String(r[3] || (r[2] ? String(r[2]).split('T')[0] : '')),
+        kategoriUtama: (r[4] as any) || 'barang',
+        items: (extra.items && Array.isArray(extra.items) && extra.items.length > 0) ? extra.items : [
+          {
+            id: `it_${String(r[0] || '1')}`,
+            nama: String(r[5] || 'Transaksi'),
+            kategori: (r[4] as any) || 'barang',
+            qty: 1,
+            hargaModal: Number(r[6]) || 0,
+            hargaJual: Number(r[7]) || 0,
+            subtotal: Number(r[7]) || 0,
+            laba: (Number(r[7]) || 0) - (Number(r[6]) || 0)
+          }
+        ],
+        totalModal: Number(r[6]) || 0,
+        totalJual: Number(r[7]) || 0,
+        totalLaba: Number(r[8]) || (Number(r[7]) || 0) - (Number(r[6]) || 0),
+        metodePembayaran: (r[9] as any) || 'tunai',
+        statusPembayaran: (r[10] as any) || 'lunas',
+        kasirName: String(r[11] || 'Kasir'),
+        kasirId: extra.kasirId || 'usr_owner',
+        namaPelanggan: extra.namaPelanggan || undefined,
+        noHpPelanggan: extra.noHpPelanggan || undefined,
+        catatan: extra.catatan || undefined,
+        jumlahBayar: extra.jumlahBayar !== undefined ? extra.jumlahBayar : undefined,
+        sisaHutang: extra.sisaHutang !== undefined ? extra.sisaHutang : undefined
+      };
+    });
 
     // 2. PENGELUARAN
     const expRows = getRows(1);
     const pengeluaran: ExpenseRecord[] = expRows.map((r) => ({
       id: String(r[0] || `exp_${Date.now()}`),
       waktu: String(r[1] || new Date().toISOString()),
-      tanggal: String(r[2] || new Date().toISOString().split('T')[0]),
+      tanggal: String(r[2] || (r[1] ? String(r[1]).split('T')[0] : '')),
       kategori: (r[3] as any) || 'Operasional Lainnya',
       deskripsi: String(r[4] || ''),
       nominal: Number(r[5]) || 0,
@@ -554,20 +598,28 @@ export async function pullAllFromGoogleSheet(
 
     // 3. HUTANG_PELANGGAN
     const debtRows = getRows(2);
-    const hutang: DebtRecord[] = debtRows.map((r) => ({
-      id: String(r[0] || `debt_${Date.now()}`),
-      transaksiId: String(r[0] || `tx_${Date.now()}`),
-      nomorStruk: String(r[1] || ''),
-      namaPelanggan: String(r[2] || 'Pelanggan'),
-      noHpPelanggan: String(r[3] || ''),
-      tanggalTransaksi: String(r[4] || new Date().toISOString().split('T')[0]),
-      jatuhTempo: String(r[5] || ''),
-      totalHutang: Number(r[6]) || 0,
-      totalDibayar: Number(r[7]) || 0,
-      sisaHutang: Number(r[8]) || 0,
-      status: (r[9] as any) || 'belum_lunas',
-      riwayatPembayaran: []
-    }));
+    const hutang: DebtRecord[] = debtRows.map((r) => {
+      let riwayat: any[] = [];
+      if (r[10]) {
+        try {
+          riwayat = JSON.parse(r[10]);
+        } catch (e) {}
+      }
+      return {
+        id: String(r[0] || `debt_${Date.now()}`),
+        transaksiId: String(r[0] || `tx_${Date.now()}`),
+        nomorStruk: String(r[1] || ''),
+        namaPelanggan: String(r[2] || 'Pelanggan'),
+        noHpPelanggan: String(r[3] || ''),
+        tanggalTransaksi: String(r[4] || ''),
+        jatuhTempo: String(r[5] || ''),
+        totalHutang: Number(r[6]) || 0,
+        totalDibayar: Number(r[7]) || 0,
+        sisaHutang: Number(r[8]) || 0,
+        status: (r[9] as any) || 'belum_lunas',
+        riwayatPembayaran: riwayat
+      };
+    });
 
     // 4. MASTER_PPOB_RANGE
     const ppobRangeRows = getRows(3);
@@ -626,12 +678,50 @@ export async function pullAllFromGoogleSheet(
       }
     };
   } catch (error: any) {
-    console.error('Error pulling from Google Sheet:', error);
     const isAuth = error?.message?.includes('AUTH_EXPIRED') || error?.message?.includes('401');
+    if (isAuth) {
+      console.warn('Google Sheets token expired while pulling data.');
+    } else {
+      console.error('Error pulling from Google Sheet:', error);
+    }
     return {
       success: false,
       isTokenExpired: isAuth,
-      message: error?.message || 'Gagal memuat data dari Google Spreadsheet.'
+      message: isAuth
+        ? 'Sesi Google telah kedaluwarsa. Silakan hubungkan ulang akun Google.'
+        : (error?.message || 'Gagal memuat data dari Google Spreadsheet.')
     };
   }
+}
+
+/**
+ * Automatically discovers an existing POS spreadsheet in Google Drive for seamless multi-device sync
+ */
+export async function findExistingStoreSpreadsheet(
+  accessToken: string
+): Promise<{ spreadsheetId: string; spreadsheetUrl: string; name: string } | null> {
+  try {
+    const q = encodeURIComponent("name contains 'POS_' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false");
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,webViewLink)&orderBy=modifiedTime+desc`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.files && data.files.length > 0) {
+      const file = data.files[0];
+      return {
+        spreadsheetId: file.id,
+        spreadsheetUrl: file.webViewLink || `https://docs.google.com/spreadsheets/d/${file.id}/edit`,
+        name: file.name
+      };
+    }
+  } catch (err) {
+    console.warn('Could not query Drive for spreadsheets:', err);
+  }
+  return null;
 }

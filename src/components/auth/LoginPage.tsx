@@ -177,6 +177,46 @@ export const LoginPage: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
+
+          {/* Quick Login Accounts & Permanent Session Note */}
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
+            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 text-center">
+              Akses Cepat (Default):
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('owner', '123')}
+                className="py-2 px-2.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/70 hover:bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 text-left transition-all text-xs"
+              >
+                <div className="font-bold flex items-center gap-1">
+                  <Shield className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>Owner</span>
+                </div>
+                <div className="text-[10px] text-amber-700/80 dark:text-amber-400 font-mono">
+                  owner / 123
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickLogin('kasir', '123')}
+                className="py-2 px-2.5 rounded-xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/70 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-900 dark:text-blue-300 text-left transition-all text-xs"
+              >
+                <div className="font-bold flex items-center gap-1">
+                  <UserCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>Kasir</span>
+                </div>
+                <div className="text-[10px] text-blue-700/80 dark:text-blue-400 font-mono">
+                  kasir / 123
+                </div>
+              </button>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 text-[11px] text-center leading-relaxed">
+              🔒 <strong>Tanpa batas waktu sesi:</strong> Sekali login, akun akan tetap masuk di perangkat ini dan hanya keluar saat Anda menekan tombol <strong>Keluar (Logout)</strong>.
+            </div>
+          </div>
         </div>
       </main>
 

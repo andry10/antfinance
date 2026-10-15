@@ -10,7 +10,8 @@ import {
   Shield,
   UserCheck,
   LogIn,
-  FileText
+  FileText,
+  LogOut
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -29,7 +30,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth }) => {
     darkMode,
     setDarkMode,
     activeTab,
-    setActiveTab
+    setActiveTab,
+    logout,
+    isGoogleTokenExpired
   } = useApp();
 
   return (
@@ -74,14 +77,16 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth }) => {
           disabled={isSyncing}
           title={syncStatusMessage}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-            googleUser
+            isGoogleTokenExpired
+              ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-xs font-bold'
+              : googleUser
               ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
               : 'bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
           }`}
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-emerald-600' : googleUser ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`} />
-          <span className="truncate max-w-[130px] hidden sm:inline">
-            {isSyncing ? 'Sync...' : googleUser ? 'Google Sheet Aktif' : 'Hubungkan Sheet'}
+          <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : isGoogleTokenExpired ? 'text-white' : googleUser ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`} />
+          <span className="truncate max-w-[140px] hidden sm:inline">
+            {isSyncing ? 'Sync...' : isGoogleTokenExpired ? 'Sambung Ulang Sheet' : googleUser ? 'Google Sheet Aktif' : 'Hubungkan Sheet'}
           </span>
         </button>
 
@@ -96,20 +101,35 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth }) => {
 
         {/* User Account Button */}
         {currentUser ? (
-          <button
-            onClick={() => setActiveTab('profil')}
-            title="Profil & Pengaturan"
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors shrink-0"
-          >
-            {currentUser.role === 'owner' ? (
-              <Shield className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            ) : (
-              <UserCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            )}
-            <span className="font-semibold max-w-[70px] sm:max-w-[100px] truncate">
-              {currentUser.name}
-            </span>
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => setActiveTab('profil')}
+              title="Profil & Pengaturan"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors shrink-0"
+            >
+              {currentUser.role === 'owner' ? (
+                <Shield className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              ) : (
+                <UserCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              )}
+              <span className="max-w-[70px] sm:max-w-[110px] truncate">
+                {currentUser.name}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                if (window.confirm('Apakah Anda yakin ingin keluar (logout)?')) {
+                  logout();
+                }
+              }}
+              title="Keluar (Logout)"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 transition-colors shrink-0"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Keluar</span>
+            </button>
+          </div>
         ) : (
           <button
             onClick={onOpenAuth}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { formatRupiah, formatNumber, formatDateTime } from '../../utils/format';
+import { formatRupiah, formatNumber, formatDateTime, getLocalDateStr } from '../../utils/format';
 import {
   TrendingUp,
   DollarSign,
@@ -42,8 +42,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenReceipt }) =
     googleUser
   } = useApp();
 
-  // Date today string
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Date today string (local device time)
+  const todayStr = getLocalDateStr();
 
   // 1. Transactions today
   const todayTransactions = transactions.filter((t) => t.tanggal === todayStr);
