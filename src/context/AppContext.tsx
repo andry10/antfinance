@@ -2027,14 +2027,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(cloudData.users));
       }
       if (cloudData.settings) {
-        setSettings((prev) => ({ ...prev, ...cloudData.settings }));
-        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify({ ...settings, ...cloudData.settings }));
+        setSettings((prev) => {
+          const nextSettings = { ...prev, ...cloudData.settings };
+          localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(nextSettings));
+          return nextSettings;
+        });
       }
     });
 
     return () => {
       isMounted = false;
       unsubscribe();
+    };
+  }, []);
+
+  // Auto-sync on window focus or tab visibility change for instant cross-device updates without browser reload
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        syncFromCloud();
+      }
+    };
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
   }, []);
 
