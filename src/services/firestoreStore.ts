@@ -1,4 +1,4 @@
-import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, onSnapshot, enableNetwork } from 'firebase/firestore';
 import { app } from './firebase';
 import {
   Transaction,
@@ -41,6 +41,7 @@ export interface StoreCloudData {
  */
 export async function fetchStoreFromFirestore(): Promise<StoreCloudData | null> {
   try {
+    await enableNetwork(db).catch(() => {});
     const snap = await getDoc(storeRef);
     if (snap.exists()) {
       return snap.data() as StoreCloudData;
@@ -52,6 +53,23 @@ export async function fetchStoreFromFirestore(): Promise<StoreCloudData | null> 
     } else {
       console.warn('Error fetching from Firestore:', err);
     }
+    return null;
+  }
+}
+
+/**
+ * Force fetch store data from Firestore (useful for manual refresh across mobile/desktop)
+ */
+export async function forceFetchStoreFromFirestore(): Promise<StoreCloudData | null> {
+  try {
+    await enableNetwork(db).catch(() => {});
+    const snap = await getDoc(storeRef);
+    if (snap.exists()) {
+      return snap.data() as StoreCloudData;
+    }
+    return null;
+  } catch (err: any) {
+    console.warn('Force fetch from Firestore error:', err);
     return null;
   }
 }

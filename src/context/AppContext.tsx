@@ -30,6 +30,7 @@ import {
 } from '../services/googleSheets';
 import {
   fetchStoreFromFirestore,
+  forceFetchStoreFromFirestore,
   saveStoreToFirestore,
   subscribeStoreFirestore,
   StoreCloudData
@@ -122,6 +123,7 @@ interface AppContextType {
   settings: StoreSettings;
   updateSettings: (newSettings: Partial<StoreSettings>) => void;
   resetDatabase: () => Promise<void>;
+  syncFromCloud: () => Promise<void>;
   isSyncing: boolean;
   syncStatusMessage: string;
   isGoogleTokenExpired: boolean;
@@ -1572,6 +1574,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const syncFromCloud = async () => {
+    try {
+      setSyncStatusMessage('Menyinkronkan data dari Cloud Database...');
+      setIsSyncing(true);
+      const cloudData = await forceFetchStoreFromFirestore();
+      if (cloudData) {
+        if (cloudData.transactions !== undefined) setTransactions(cloudData.transactions || []);
+        if (cloudData.expenses !== undefined) setExpenses(cloudData.expenses || []);
+        if (cloudData.debts !== undefined) setDebts(cloudData.debts || []);
+        if (cloudData.ppobRanges !== undefined) setPpobRanges(cloudData.ppobRanges || []);
+        if (cloudData.ppobLains !== undefined) setPpobLains(cloudData.ppobLains || []);
+        if (cloudData.barangList !== undefined) setBarangList(cloudData.barangList || []);
+        if (cloudData.bbmList !== undefined) setBbmList(cloudData.bbmList || []);
+        if (cloudData.psUnits !== undefined) setPsUnits(cloudData.psUnits || []);
+        if (cloudData.activePsSessions !== undefined) setActivePsSessions(cloudData.activePsSessions || []);
+        if (cloudData.psSisaWaktuList !== undefined) setPsSisaWaktuList(cloudData.psSisaWaktuList || []);
+        if (cloudData.users !== undefined && cloudData.users.length > 0) setUsers(cloudData.users);
+        if (cloudData.settings) setSettings((prev) => ({ ...prev, ...cloudData.settings }));
+        setSyncStatusMessage('Berhasil menyinkronkan dari Cloud!');
+      } else {
+        setSyncStatusMessage('Cloud kosong atau tidak dapat dijangkau.');
+      }
+    } catch (err: any) {
+      console.error('Sync from cloud error:', err);
+      setSyncStatusMessage(`Gagal sinkron: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const triggerGoogleSheetSync = async (
     silent: boolean = false,
     interactive: boolean = false,
@@ -1996,6 +2028,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         settings,
         updateSettings,
         resetDatabase,
+        syncFromCloud,
         isSyncing,
         syncStatusMessage,
         isGoogleTokenExpired: isGoogleTokenExpiredState,

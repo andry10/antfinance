@@ -37,6 +37,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenAuthModal }) => 
     toggleUserActive,
     resetUserPassword,
     resetDatabase,
+    syncFromCloud,
     settings,
     updateSettings,
     logout
@@ -460,6 +461,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onOpenAuthModal }) => 
                     className="w-full py-2 px-4 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow transition-colors"
                   >
                     🔄 Reset Database (Kosongkan Transaksi, Akun Tetap)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await syncFromCloud();
+                      alert('Sinkronisasi dari Cloud selesai. Data terbaru (termasuk reset) telah dimuat di perangkat ini.');
+                    }}
+                    className="w-full py-2 px-4 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow transition-colors flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>🔄 Paksa Muat Ulang / Sinkron dari Cloud (HP)</span>
                   </button>
                 </div>
               )}
