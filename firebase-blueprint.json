@@ -1,0 +1,69 @@
+{
+  "entities": {
+    "StoreData": {
+      "title": "Store Data",
+      "description": "Comprehensive store database snapshot for POS synchronization across devices",
+      "type": "object",
+      "properties": {
+        "transactions": {
+          "type": "array",
+          "description": "List of transactions"
+        },
+        "expenses": {
+          "type": "array",
+          "description": "List of expense records"
+        },
+        "debts": {
+          "type": "array",
+          "description": "List of debt records"
+        },
+        "barangList": {
+          "type": "array",
+          "description": "Master products list"
+        },
+        "ppobRanges": {
+          "type": "array",
+          "description": "Master PPOB ranges"
+        },
+        "ppobLains": {
+          "type": "array",
+          "description": "Master PPOB lain-lain"
+        },
+        "bbmList": {
+          "type": "array",
+          "description": "Master BBM list"
+        },
+        "psUnits": {
+          "type": "array",
+          "description": "Master PS units"
+        },
+        "activePsSessions": {
+          "type": "array",
+          "description": "Active PlayStation rental sessions"
+        },
+        "psSisaWaktuList": {
+          "type": "array",
+          "description": "PlayStation leftover time list"
+        },
+        "users": {
+          "type": "array",
+          "description": "User accounts"
+        },
+        "settings": {
+          "type": "object",
+          "description": "Store settings"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last updated ISO timestamp"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/stores/{storeId}": {
+      "schema": "StoreData",
+      "description": "Master store documents containing all active records and master data"
+    }
+  }
+}

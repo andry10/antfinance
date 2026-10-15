@@ -123,6 +123,7 @@ interface AppContextType {
   settings: StoreSettings;
   updateSettings: (newSettings: Partial<StoreSettings>) => void;
   resetDatabase: () => Promise<void>;
+  clearAllTransactions: () => Promise<void>;
   syncFromCloud: () => Promise<void>;
   isSyncing: boolean;
   syncStatusMessage: string;
@@ -1102,7 +1103,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setDebts(updatedDebtsList);
     }
 
-    // Immediately trigger auto-sync to Google Sheet so other devices and spreadsheet update without waiting
+    // Immediately trigger auto-sync to Firestore and Google Sheet so other devices update instantly
+    saveStoreToFirestore({
+      transactions: updatedTransactions,
+      debts: updatedDebtsList
+    }).catch(() => {});
+
     triggerGoogleSheetSync(true, false, {
       transaksi: updatedTransactions,
       hutang: updatedDebtsList
@@ -1116,6 +1122,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedDebts = debts.filter((d) => d.transaksiId !== id);
     setTransactions(updatedTx);
     setDebts(updatedDebts);
+    saveStoreToFirestore({
+      transactions: updatedTx,
+      debts: updatedDebts
+    }).catch(() => {});
     triggerGoogleSheetSync(true, false, {
       transaksi: updatedTx,
       hutang: updatedDebts
@@ -1125,6 +1135,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteDebt = (id: string) => {
     const updatedDebts = debts.filter((d) => d.id !== id);
     setDebts(updatedDebts);
+    saveStoreToFirestore({
+      debts: updatedDebts
+    }).catch(() => {});
     triggerGoogleSheetSync(true, false, { hutang: updatedDebts }).catch(() => {});
   };
 
@@ -1158,6 +1171,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updatedDebtsList = updated;
       return updated;
     });
+    saveStoreToFirestore({
+      debts: updatedDebtsList
+    }).catch(() => {});
     triggerGoogleSheetSync(true, false, { hutang: updatedDebtsList }).catch(() => {});
   };
 
@@ -1174,12 +1190,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     const updatedExpenses = [newExp, ...expenses];
     setExpenses(updatedExpenses);
+    saveStoreToFirestore({
+      expenses: updatedExpenses
+    }).catch(() => {});
     triggerGoogleSheetSync(true, false, { pengeluaran: updatedExpenses }).catch(() => {});
   };
 
   const deleteExpense = (id: string) => {
     const updatedExpenses = expenses.filter((e) => e.id !== id);
     setExpenses(updatedExpenses);
+    saveStoreToFirestore({
+      expenses: updatedExpenses
+    }).catch(() => {});
     triggerGoogleSheetSync(true, false, { pengeluaran: updatedExpenses }).catch(() => {});
   };
 
@@ -1542,6 +1564,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetDatabase = async () => {
+    isRemoteUpdateRef.current = true;
     setTransactions([]);
     setExpenses([]);
     setDebts([]);
@@ -1571,6 +1594,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSyncStatusMessage('Database berhasil direset (transaksi dibersihkan, akun tetap aman).');
     } catch (err: any) {
       console.error('Failed to reset database:', err);
+    }
+  };
+
+  const clearAllTransactions = async () => {
+    isRemoteUpdateRef.current = true;
+    setTransactions([]);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
+      await saveStoreToFirestore({
+        transactions: []
+      });
+      setSyncStatusMessage('Seluruh transaksi berhasil dibersihkan.');
+    } catch (err: any) {
+      console.error('Failed to clear all transactions:', err);
     }
   };
 
@@ -2184,6 +2221,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         settings,
         updateSettings,
         resetDatabase,
+        clearAllTransactions,
         syncFromCloud,
         isSyncing,
         syncStatusMessage,

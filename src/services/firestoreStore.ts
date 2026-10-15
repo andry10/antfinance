@@ -1,5 +1,14 @@
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, enableNetwork } from 'firebase/firestore';
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  onSnapshot,
+  enableNetwork,
+  Firestore
+} from 'firebase/firestore';
 import { app } from './firebase';
+import firebaseConfig from '../../firebase-applet-config.json';
 import {
   Transaction,
   ExpenseRecord,
@@ -15,10 +24,12 @@ import {
   StoreSettings
 } from '../types';
 
-export const db = getFirestore(app);
+export const db: Firestore = (firebaseConfig as any).firestoreDatabaseId
+  ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
+  : getFirestore(app);
 
-const STORE_DOC_ID = 'pos_main_store_v5';
-const storeRef = doc(db, 'stores', STORE_DOC_ID);
+export const STORE_DOC_ID = 'pos_main_store_v6';
+export const storeRef = doc(db, 'stores', STORE_DOC_ID);
 
 export interface StoreCloudData {
   transactions?: Transaction[];
@@ -34,10 +45,30 @@ export interface StoreCloudData {
   users?: UserAccount[];
   settings?: StoreSettings;
   updatedAt?: string;
+  lastUpdatedDevice?: string;
 }
 
 /**
- * Fetch initial store data from Firestore
+ * Recursively cleans objects to remove any `undefined` values so Firestore setDoc never throws.
+ */
+export function sanitizeForFirestore(obj: any): any {
+  if (obj === undefined) return null;
+  if (obj === null) return null;
+  if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map((item) => sanitizeForFirestore(item));
+  }
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      result[key] = sanitizeForFirestore(value);
+    }
+  }
+  return result;
+}
+
+/**
+ * Fetch store data from Firestore
  */
 export async function fetchStoreFromFirestore(): Promise<StoreCloudData | null> {
   try {
@@ -48,11 +79,7 @@ export async function fetchStoreFromFirestore(): Promise<StoreCloudData | null> 
     }
     return null;
   } catch (err: any) {
-    if (err?.code === 'unavailable' || err?.message?.includes('offline')) {
-      console.info('Firestore is offline. Using local cached data.');
-    } else {
-      console.warn('Error fetching from Firestore:', err);
-    }
+    console.warn('Error fetching from Firestore:', err);
     return null;
   }
 }
@@ -75,24 +102,18 @@ export async function forceFetchStoreFromFirestore(): Promise<StoreCloudData | n
 }
 
 /**
- * Save store data to Firestore
+ * Save store data to Firestore with sanitization
  */
-export async function saveStoreToFirestore(data: StoreCloudData): Promise<boolean> {
+export async function saveStoreToFirestore(data: Partial<StoreCloudData>): Promise<boolean> {
   try {
-    const cleanData = JSON.parse(
-      JSON.stringify({
-        ...data,
-        updatedAt: new Date().toISOString()
-      })
-    );
-    await setDoc(storeRef, cleanData, { merge: true });
+    const cleanPayload = sanitizeForFirestore({
+      ...data,
+      updatedAt: new Date().toISOString()
+    });
+    await setDoc(storeRef, cleanPayload, { merge: true });
     return true;
   } catch (err: any) {
-    if (err?.code === 'unavailable' || err?.message?.includes('offline')) {
-      console.info('Firestore is offline. Changes stored locally.');
-    } else {
-      console.warn('Error saving to Firestore:', err);
-    }
+    console.error('Error saving to Firestore:', err);
     return false;
   }
 }
@@ -100,17 +121,23 @@ export async function saveStoreToFirestore(data: StoreCloudData): Promise<boolea
 /**
  * Subscribe to real-time updates from Firestore (instant multi-device sync)
  */
-export function subscribeStoreFirestore(onDataUpdated: (data: StoreCloudData) => void) {
-  return onSnapshot(storeRef, (snap) => {
-    if (snap.exists()) {
-      onDataUpdated(snap.data() as StoreCloudData);
-    }
-  }, (err: any) => {
-    if (err?.code === 'unavailable' || err?.message?.includes('offline')) {
-      console.info('Firestore subscription offline.');
-    } else {
+export function subscribeStoreFirestore(
+  onDataUpdated: (data: StoreCloudData, isFromCache: boolean) => void,
+  onError?: (error: any) => void
+) {
+  return onSnapshot(
+    storeRef,
+    { includeMetadataChanges: true },
+    (snap) => {
+      if (snap.exists()) {
+        const data = snap.data() as StoreCloudData;
+        const isFromCache = snap.metadata.fromCache;
+        onDataUpdated(data, isFromCache);
+      }
+    },
+    (err: any) => {
       console.warn('Firestore subscription error:', err);
+      if (onError) onError(err);
     }
-  });
+  );
 }
-
