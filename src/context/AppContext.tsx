@@ -1580,25 +1580,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsSyncing(true);
       const cloudData = await forceFetchStoreFromFirestore();
       if (cloudData) {
-        if (cloudData.transactions !== undefined) setTransactions(cloudData.transactions || []);
-        if (cloudData.expenses !== undefined) setExpenses(cloudData.expenses || []);
-        if (cloudData.debts !== undefined) setDebts(cloudData.debts || []);
-        if (cloudData.ppobRanges !== undefined) setPpobRanges(cloudData.ppobRanges || []);
-        if (cloudData.ppobLains !== undefined) setPpobLains(cloudData.ppobLains || []);
-        if (cloudData.barangList !== undefined) setBarangList(cloudData.barangList || []);
-        if (cloudData.bbmList !== undefined) setBbmList(cloudData.bbmList || []);
-        if (cloudData.psUnits !== undefined) setPsUnits(cloudData.psUnits || []);
-        if (cloudData.activePsSessions !== undefined) setActivePsSessions(cloudData.activePsSessions || []);
-        if (cloudData.psSisaWaktuList !== undefined) setPsSisaWaktuList(cloudData.psSisaWaktuList || []);
-        if (cloudData.users !== undefined && cloudData.users.length > 0) setUsers(cloudData.users);
-        if (cloudData.settings) setSettings((prev) => ({ ...prev, ...cloudData.settings }));
+        if (cloudData.transactions !== undefined) {
+          setTransactions(cloudData.transactions || []);
+          localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(cloudData.transactions || []));
+        }
+        if (cloudData.expenses !== undefined) {
+          setExpenses(cloudData.expenses || []);
+          localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(cloudData.expenses || []));
+        }
+        if (cloudData.debts !== undefined) {
+          setDebts(cloudData.debts || []);
+          localStorage.setItem(STORAGE_KEYS.DEBTS, JSON.stringify(cloudData.debts || []));
+        }
+        if (cloudData.ppobRanges !== undefined) {
+          setPpobRanges(cloudData.ppobRanges || []);
+          localStorage.setItem(STORAGE_KEYS.PPOB_RANGES, JSON.stringify(cloudData.ppobRanges || []));
+        }
+        if (cloudData.ppobLains !== undefined) {
+          setPpobLains(cloudData.ppobLains || []);
+          localStorage.setItem(STORAGE_KEYS.PPOB_LAIN, JSON.stringify(cloudData.ppobLains || []));
+        }
+        if (cloudData.barangList !== undefined) {
+          setBarangList(cloudData.barangList || []);
+          localStorage.setItem(STORAGE_KEYS.BARANG, JSON.stringify(cloudData.barangList || []));
+        }
+        if (cloudData.bbmList !== undefined) {
+          setBbmList(cloudData.bbmList || []);
+          localStorage.setItem(STORAGE_KEYS.BBM, JSON.stringify(cloudData.bbmList || []));
+        }
+        if (cloudData.psUnits !== undefined) {
+          setPsUnits(cloudData.psUnits || []);
+          localStorage.setItem(STORAGE_KEYS.PS_UNITS, JSON.stringify(cloudData.psUnits || []));
+        }
+        if (cloudData.activePsSessions !== undefined) {
+          setActivePsSessions(cloudData.activePsSessions || []);
+          localStorage.setItem(STORAGE_KEYS.PS_SESSIONS, JSON.stringify(cloudData.activePsSessions || []));
+        }
+        if (cloudData.psSisaWaktuList !== undefined) {
+          setPsSisaWaktuList(cloudData.psSisaWaktuList || []);
+          localStorage.setItem(STORAGE_KEYS.PS_SISA_WAKTU, JSON.stringify(cloudData.psSisaWaktuList || []));
+        }
+        if (cloudData.users !== undefined && cloudData.users.length > 0) {
+          setUsers(cloudData.users);
+          localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(cloudData.users));
+        }
+        if (cloudData.settings) {
+          setSettings((prev) => ({ ...prev, ...cloudData.settings }));
+          localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify({ ...settings, ...cloudData.settings }));
+        }
         setSyncStatusMessage('Berhasil menyinkronkan dari Cloud!');
       } else {
         setSyncStatusMessage('Cloud kosong atau tidak dapat dijangkau.');
       }
     } catch (err: any) {
       console.error('Sync from cloud error:', err);
-      setSyncStatusMessage(`Gagal sinkron: ${err.message || 'Unknown error'}`);
+      setSyncStatusMessage(`Gagal sinkron: ${err.message || 'Offline'}`);
     } finally {
       setIsSyncing(false);
     }
@@ -1869,22 +1905,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSyncStatusMessage('Menghubungkan ke Cloud Database (Firebase)...');
         const cloudData = await fetchStoreFromFirestore();
         if (cloudData && isMounted) {
-          if (cloudData.transactions !== undefined) setTransactions(cloudData.transactions || []);
-          if (cloudData.expenses !== undefined) setExpenses(cloudData.expenses || []);
-          if (cloudData.debts !== undefined) setDebts(cloudData.debts || []);
-          if (cloudData.ppobRanges !== undefined) setPpobRanges(cloudData.ppobRanges || []);
-          if (cloudData.ppobLains !== undefined) setPpobLains(cloudData.ppobLains || []);
-          if (cloudData.barangList !== undefined) setBarangList(cloudData.barangList || []);
-          if (cloudData.bbmList !== undefined) setBbmList(cloudData.bbmList || []);
-          if (cloudData.psUnits !== undefined) setPsUnits(cloudData.psUnits || []);
-          if (cloudData.activePsSessions !== undefined) setActivePsSessions(cloudData.activePsSessions || []);
-          if (cloudData.psSisaWaktuList !== undefined) setPsSisaWaktuList(cloudData.psSisaWaktuList || []);
-          if (cloudData.users !== undefined && cloudData.users.length > 0) setUsers(cloudData.users);
-          if (cloudData.settings) setSettings((prev) => ({ ...prev, ...cloudData.settings }));
+          if (cloudData.transactions !== undefined) {
+            setTransactions(cloudData.transactions || []);
+            localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(cloudData.transactions || []));
+          }
+          if (cloudData.expenses !== undefined) {
+            setExpenses(cloudData.expenses || []);
+            localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(cloudData.expenses || []));
+          }
+          if (cloudData.debts !== undefined) {
+            setDebts(cloudData.debts || []);
+            localStorage.setItem(STORAGE_KEYS.DEBTS, JSON.stringify(cloudData.debts || []));
+          }
+          if (cloudData.ppobRanges !== undefined) {
+            setPpobRanges(cloudData.ppobRanges || []);
+            localStorage.setItem(STORAGE_KEYS.PPOB_RANGES, JSON.stringify(cloudData.ppobRanges || []));
+          }
+          if (cloudData.ppobLains !== undefined) {
+            setPpobLains(cloudData.ppobLains || []);
+            localStorage.setItem(STORAGE_KEYS.PPOB_LAIN, JSON.stringify(cloudData.ppobLains || []));
+          }
+          if (cloudData.barangList !== undefined) {
+            setBarangList(cloudData.barangList || []);
+            localStorage.setItem(STORAGE_KEYS.BARANG, JSON.stringify(cloudData.barangList || []));
+          }
+          if (cloudData.bbmList !== undefined) {
+            setBbmList(cloudData.bbmList || []);
+            localStorage.setItem(STORAGE_KEYS.BBM, JSON.stringify(cloudData.bbmList || []));
+          }
+          if (cloudData.psUnits !== undefined) {
+            setPsUnits(cloudData.psUnits || []);
+            localStorage.setItem(STORAGE_KEYS.PS_UNITS, JSON.stringify(cloudData.psUnits || []));
+          }
+          if (cloudData.activePsSessions !== undefined) {
+            setActivePsSessions(cloudData.activePsSessions || []);
+            localStorage.setItem(STORAGE_KEYS.PS_SESSIONS, JSON.stringify(cloudData.activePsSessions || []));
+          }
+          if (cloudData.psSisaWaktuList !== undefined) {
+            setPsSisaWaktuList(cloudData.psSisaWaktuList || []);
+            localStorage.setItem(STORAGE_KEYS.PS_SISA_WAKTU, JSON.stringify(cloudData.psSisaWaktuList || []));
+          }
+          if (cloudData.users !== undefined && cloudData.users.length > 0) {
+            setUsers(cloudData.users);
+            localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(cloudData.users));
+          }
+          if (cloudData.settings) {
+            setSettings((prev) => ({ ...prev, ...cloudData.settings }));
+            localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify({ ...settings, ...cloudData.settings }));
+          }
           setSyncStatusMessage('Cloud Database aktif & tersinkron otomatis');
+        } else if (isMounted) {
+          // Cloud is empty (first time), initialize cloud with current local state
+          await saveStoreToFirestore({
+            transactions,
+            expenses,
+            debts,
+            ppobRanges,
+            ppobLains,
+            barangList,
+            bbmList,
+            psUnits,
+            activePsSessions,
+            psSisaWaktuList,
+            users,
+            settings
+          });
+          setSyncStatusMessage('Cloud Database diinisialisasi dari perangkat.');
         }
       } catch (err) {
-        console.warn('Initial Firestore fetch:', err);
+        console.warn('Initial Firestore fetch / init:', err);
+        setSyncStatusMessage('Offline - Menggunakan Cache Perangkat (Akan sinkron saat online)');
       }
     };
     initFirestoreSync();
@@ -1892,18 +1982,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Real-time subscription across devices (instant sync when PC, desktop, or mobile adds/changes data)
     const unsubscribe = subscribeStoreFirestore((cloudData) => {
       if (!isMounted) return;
-      if (cloudData.transactions !== undefined) setTransactions(cloudData.transactions || []);
-      if (cloudData.expenses !== undefined) setExpenses(cloudData.expenses || []);
-      if (cloudData.debts !== undefined) setDebts(cloudData.debts || []);
-      if (cloudData.ppobRanges !== undefined) setPpobRanges(cloudData.ppobRanges || []);
-      if (cloudData.ppobLains !== undefined) setPpobLains(cloudData.ppobLains || []);
-      if (cloudData.barangList !== undefined) setBarangList(cloudData.barangList || []);
-      if (cloudData.bbmList !== undefined) setBbmList(cloudData.bbmList || []);
-      if (cloudData.psUnits !== undefined) setPsUnits(cloudData.psUnits || []);
-      if (cloudData.activePsSessions !== undefined) setActivePsSessions(cloudData.activePsSessions || []);
-      if (cloudData.psSisaWaktuList !== undefined) setPsSisaWaktuList(cloudData.psSisaWaktuList || []);
-      if (cloudData.users !== undefined && cloudData.users.length > 0) setUsers(cloudData.users);
-      if (cloudData.settings) setSettings((prev) => ({ ...prev, ...cloudData.settings }));
+      if (cloudData.transactions !== undefined) {
+        setTransactions(cloudData.transactions || []);
+        localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(cloudData.transactions || []));
+      }
+      if (cloudData.expenses !== undefined) {
+        setExpenses(cloudData.expenses || []);
+        localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(cloudData.expenses || []));
+      }
+      if (cloudData.debts !== undefined) {
+        setDebts(cloudData.debts || []);
+        localStorage.setItem(STORAGE_KEYS.DEBTS, JSON.stringify(cloudData.debts || []));
+      }
+      if (cloudData.ppobRanges !== undefined) {
+        setPpobRanges(cloudData.ppobRanges || []);
+        localStorage.setItem(STORAGE_KEYS.PPOB_RANGES, JSON.stringify(cloudData.ppobRanges || []));
+      }
+      if (cloudData.ppobLains !== undefined) {
+        setPpobLains(cloudData.ppobLains || []);
+        localStorage.setItem(STORAGE_KEYS.PPOB_LAIN, JSON.stringify(cloudData.ppobLains || []));
+      }
+      if (cloudData.barangList !== undefined) {
+        setBarangList(cloudData.barangList || []);
+        localStorage.setItem(STORAGE_KEYS.BARANG, JSON.stringify(cloudData.barangList || []));
+      }
+      if (cloudData.bbmList !== undefined) {
+        setBbmList(cloudData.bbmList || []);
+        localStorage.setItem(STORAGE_KEYS.BBM, JSON.stringify(cloudData.bbmList || []));
+      }
+      if (cloudData.psUnits !== undefined) {
+        setPsUnits(cloudData.psUnits || []);
+        localStorage.setItem(STORAGE_KEYS.PS_UNITS, JSON.stringify(cloudData.psUnits || []));
+      }
+      if (cloudData.activePsSessions !== undefined) {
+        setActivePsSessions(cloudData.activePsSessions || []);
+        localStorage.setItem(STORAGE_KEYS.PS_SESSIONS, JSON.stringify(cloudData.activePsSessions || []));
+      }
+      if (cloudData.psSisaWaktuList !== undefined) {
+        setPsSisaWaktuList(cloudData.psSisaWaktuList || []);
+        localStorage.setItem(STORAGE_KEYS.PS_SISA_WAKTU, JSON.stringify(cloudData.psSisaWaktuList || []));
+      }
+      if (cloudData.users !== undefined && cloudData.users.length > 0) {
+        setUsers(cloudData.users);
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(cloudData.users));
+      }
+      if (cloudData.settings) {
+        setSettings((prev) => ({ ...prev, ...cloudData.settings }));
+        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify({ ...settings, ...cloudData.settings }));
+      }
     });
 
     return () => {
