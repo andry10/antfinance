@@ -28,6 +28,12 @@ import {
   pullAllFromGoogleSheet,
   findExistingStoreSpreadsheet
 } from '../services/googleSheets';
+import {
+  fetchStoreFromFirestore,
+  saveStoreToFirestore,
+  subscribeStoreFirestore,
+  StoreCloudData
+} from '../services/firestoreStore';
 
 interface AppContextType {
   // Auth state
@@ -1789,63 +1795,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Automatic pull & sync on startup ("saat buka awal") so multiple devices always have identical data
-  const hasPulledOnStartup = useRef(false);
+  // Firebase Firestore automatic cloud sync for all store data & master across devices
   useEffect(() => {
-    if (hasPulledOnStartup.current) return;
-    const token = googleAccessToken || (typeof window !== 'undefined' ? localStorage.getItem('pos_google_access_token') : null);
-    if (!token || isGoogleTokenExpired()) return;
-
-    hasPulledOnStartup.current = true;
-    const runStartupSync = async () => {
-      let sheetId = settings.spreadsheetId;
-      if (!sheetId) {
-        const found = await findExistingStoreSpreadsheet(token);
-        if (found) {
-          sheetId = found.spreadsheetId;
-          updateSettings({
-            spreadsheetId: found.spreadsheetId,
-            spreadsheetUrl: found.spreadsheetUrl,
-            autoSyncSheets: true
-          });
+    let isMounted = true;
+    const initFirestoreSync = async () => {
+      try {
+        setSyncStatusMessage('Menghubungkan ke Cloud Database (Firebase)...');
+        const cloudData = await fetchStoreFromFirestore();
+        if (cloudData && isMounted) {
+          if (cloudData.transactions && cloudData.transactions.length > 0) setTransactions(cloudData.transactions);
+          if (cloudData.expenses && cloudData.expenses.length > 0) setExpenses(cloudData.expenses);
+          if (cloudData.debts && cloudData.debts.length > 0) setDebts(cloudData.debts);
+          if (cloudData.ppobRanges && cloudData.ppobRanges.length > 0) setPpobRanges(cloudData.ppobRanges);
+          if (cloudData.ppobLains && cloudData.ppobLains.length > 0) setPpobLains(cloudData.ppobLains);
+          if (cloudData.barangList && cloudData.barangList.length > 0) setBarangList(cloudData.barangList);
+          if (cloudData.bbmList && cloudData.bbmList.length > 0) setBbmList(cloudData.bbmList);
+          if (cloudData.psUnits && cloudData.psUnits.length > 0) setPsUnits(cloudData.psUnits);
+          if (cloudData.activePsSessions) setActivePsSessions(cloudData.activePsSessions);
+          if (cloudData.psSisaWaktuList) setPsSisaWaktuList(cloudData.psSisaWaktuList);
+          if (cloudData.users && cloudData.users.length > 0) setUsers(cloudData.users);
+          if (cloudData.settings) setSettings((prev) => ({ ...prev, ...cloudData.settings }));
+          setSyncStatusMessage('Cloud Database aktif & tersinkron otomatis');
         }
-      }
-      if (sheetId) {
-        setSyncStatusMessage('Memuat data terbaru dari Google Spreadsheet...');
-        const res = await pullAllFromGoogleSheet(token, sheetId);
-        if (res.success && res.data) {
-          if (res.data.transaksi && res.data.transaksi.length > 0) setTransactions(res.data.transaksi);
-          if (res.data.pengeluaran && res.data.pengeluaran.length > 0) setExpenses(res.data.pengeluaran);
-          if (res.data.hutang && res.data.hutang.length > 0) setDebts(res.data.hutang);
-          if (res.data.barang && res.data.barang.length > 0) setBarangList(res.data.barang);
-          if (res.data.bbm && res.data.bbm.length > 0) setBbmList(res.data.bbm);
-          if (res.data.ppobRange && res.data.ppobRange.length > 0) setPpobRanges(res.data.ppobRange);
-          if (res.data.ppobLain && res.data.ppobLain.length > 0) setPpobLains(res.data.ppobLain);
-          const nowTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-          setSyncStatusMessage(`Database otomatis tersinkron dari Sheet pukul ${nowTime}`);
-        }
+      } catch (err) {
+        console.warn('Initial Firestore fetch:', err);
       }
     };
-    runStartupSync().catch(() => {});
-  }, [googleAccessToken, settings.spreadsheetId]);
+    initFirestoreSync();
 
-  // Background debounced auto-sync to Google Sheet whenever any store data changes
-  const isInitialSyncMount = useRef(true);
+    // Real-time subscription across devices (instant sync when PC, desktop, or mobile adds/changes data)
+    const unsubscribe = subscribeStoreFirestore((cloudData) => {
+      if (!isMounted) return;
+      if (cloudData.transactions) setTransactions(cloudData.transactions);
+      if (cloudData.expenses) setExpenses(cloudData.expenses);
+      if (cloudData.debts) setDebts(cloudData.debts);
+      if (cloudData.ppobRanges) setPpobRanges(cloudData.ppobRanges);
+      if (cloudData.ppobLains) setPpobLains(cloudData.ppobLains);
+      if (cloudData.barangList) setBarangList(cloudData.barangList);
+      if (cloudData.bbmList) setBbmList(cloudData.bbmList);
+      if (cloudData.psUnits) setPsUnits(cloudData.psUnits);
+      if (cloudData.activePsSessions) setActivePsSessions(cloudData.activePsSessions);
+      if (cloudData.psSisaWaktuList) setPsSisaWaktuList(cloudData.psSisaWaktuList);
+      if (cloudData.users) setUsers(cloudData.users);
+      if (cloudData.settings) setSettings((prev) => ({ ...prev, ...cloudData.settings }));
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  // Background debounced auto-save to Firebase Firestore whenever store data changes
+  const isInitialCloudSaveMount = useRef(true);
   useEffect(() => {
-    if (isInitialSyncMount.current) {
-      isInitialSyncMount.current = false;
+    if (isInitialCloudSaveMount.current) {
+      isInitialCloudSaveMount.current = false;
       return;
     }
 
-    // Auto sync requires active token, not expired, and autoSyncSheets enabled
-    const token = googleAccessToken || (typeof window !== 'undefined' ? localStorage.getItem('pos_google_access_token') : null);
-    if (!token || isGoogleTokenExpired() || isGoogleTokenExpiredState || settings.autoSyncSheets === false) return;
-
     const timer = setTimeout(() => {
-      triggerGoogleSheetSync(true).catch((e) => {
-        console.warn('Auto-sync background check:', e);
+      saveStoreToFirestore({
+        transactions,
+        expenses,
+        debts,
+        ppobRanges,
+        ppobLains,
+        barangList,
+        bbmList,
+        psUnits,
+        activePsSessions,
+        psSisaWaktuList,
+        users,
+        settings
+      }).catch((e) => {
+        console.warn('Auto-save to Firestore:', e);
       });
-    }, 400);
+    }, 600);
 
     return () => clearTimeout(timer);
   }, [
@@ -1856,9 +1882,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     bbmList,
     ppobRanges,
     ppobLains,
+    psUnits,
     activePsSessions,
-    googleAccessToken,
-    settings.autoSyncSheets,
+    psSisaWaktuList,
+    users,
+    settings
   ]);
 
   return (

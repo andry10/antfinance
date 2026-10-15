@@ -155,6 +155,12 @@ export const connectBluetoothPrinter = async (): Promise<{ success: boolean; dev
     if (err.name === 'NotFoundError' || err.message?.includes('User cancelled')) {
       return { success: false, error: 'Pemilihan printer Bluetooth dibatalkan.' };
     }
+    if (err.name === 'SecurityError' || err.message?.includes('permissions policy') || err.message?.includes('disallowed') || err.message?.includes('requestDevice')) {
+      return {
+        success: false,
+        error: 'Akses Bluetooth dibatasi oleh Policy Preview Iframe. Silakan buka aplikasi pada tab browser mandiri (standalone) atau jendela terpisah untuk menghubungkan printer Bluetooth.',
+      };
+    }
     return {
       success: false,
       error: err.message || 'Gagal menyambungkan ke printer Bluetooth.',

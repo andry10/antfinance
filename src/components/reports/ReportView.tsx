@@ -10,7 +10,6 @@ import {
   DollarSign,
   Download,
   Printer,
-  FileSpreadsheet,
   Fuel,
   Gamepad2,
   Zap,
@@ -26,7 +25,7 @@ import {
 } from 'lucide-react';
 
 export const ReportView: React.FC = () => {
-  const { transactions, expenses, debts, bbmList, settings, currentUser, triggerGoogleSheetSync, isSyncing } = useApp();
+  const { transactions, expenses, debts, bbmList, settings, currentUser } = useApp();
 
   const getTodayStr = () => getLocalDateStr();
 
@@ -300,18 +299,7 @@ export const ReportView: React.FC = () => {
             Rekapitulasi lengkap omset penjualan, modal HPP, laba kotor, beban operasional, dan laba bersih riil.
           </p>
         </div>
-
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => triggerGoogleSheetSync(false, true)}
-            disabled={isSyncing}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-xs transition-colors"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkron ke Sheets'}</span>
-          </button>
-
           <button
             onClick={exportToCSV}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 shadow-xs transition-colors"

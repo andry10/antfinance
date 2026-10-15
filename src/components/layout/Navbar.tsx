@@ -2,16 +2,15 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Store,
-  RefreshCw,
   Sun,
   Moon,
-  ExternalLink,
   Plus,
   Shield,
   UserCheck,
   LogIn,
   FileText,
-  LogOut
+  LogOut,
+  Database
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -21,18 +20,12 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth }) => {
   const {
     currentUser,
-    googleUser,
     settings,
-    isSyncing,
-    syncStatusMessage,
-    triggerGoogleSheetSync,
-    openNewTxModal,
     darkMode,
     setDarkMode,
     activeTab,
     setActiveTab,
-    logout,
-    isGoogleTokenExpired
+    logout
   } = useApp();
 
   return (
@@ -70,25 +63,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth }) => {
           <span className="hidden md:inline">Laporan</span>
         </button>
 
-        {/* Google Sheet Sync Status Button */}
-        <button
-          type="button"
-          onClick={() => triggerGoogleSheetSync(false, true)}
-          disabled={isSyncing}
-          title={syncStatusMessage}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-            isGoogleTokenExpired
-              ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-xs font-bold'
-              : googleUser
-              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-              : 'bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-          }`}
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : isGoogleTokenExpired ? 'text-white' : googleUser ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`} />
-          <span className="truncate max-w-[140px] hidden sm:inline">
-            {isSyncing ? 'Sync...' : isGoogleTokenExpired ? 'Sambung Ulang Sheet' : googleUser ? 'Google Sheet Aktif' : 'Hubungkan Sheet'}
-          </span>
-        </button>
+        {/* Firebase Cloud DB Active Badge */}
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800" title="Database otomatis tersinkron via Firebase Cloud">
+          <Database className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 animate-pulse" />
+          <span className="truncate max-w-[130px]">Firebase Cloud</span>
+        </div>
 
         {/* Dark Mode Toggle */}
         <button

@@ -65,7 +65,7 @@ export const BottomNav: React.FC = () => {
     {
       id: 'profil',
       label: 'Profil & Kelola User',
-      desc: 'Akun kasir, owner, dan sync spreadsheet',
+      desc: 'Akun kasir, owner, dan pengaturan toko',
       icon: UserCog,
       badge: null
     }
